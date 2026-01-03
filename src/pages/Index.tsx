@@ -44,12 +44,12 @@ const Index = () => {
             >
               How it Works
             </a>
-            <a
+            {/* <a
               href="#testimonials"
               className="text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
               Testimonials
-            </a>
+            </a> */}
           </nav>
           <div className="flex items-center gap-3">
             {user ? (
@@ -224,7 +224,7 @@ const Index = () => {
       </section>
 
       {/* Testimonials */}
-      <section id="testimonials" className="py-24 px-6 bg-muted/20">
+      {/* <section id="testimonials" className="py-24 px-6 bg-muted/20">
         <div className="container mx-auto max-w-6xl">
           <div className="text-center mb-16">
             <span className="text-primary text-sm font-semibold uppercase tracking-wider">
@@ -253,7 +253,7 @@ const Index = () => {
             />
           </div>
         </div>
-      </section>
+      </section> */}
 
       {/* CTA Section */}
       <section className="py-24 px-6">
