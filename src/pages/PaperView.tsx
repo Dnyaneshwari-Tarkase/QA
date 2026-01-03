@@ -335,7 +335,7 @@ export default function PaperView() {
 
             {/* Footer */}
             <div className="text-center pt-8 border-t border-border">
-              <p className="text-sm text-muted-foreground">--- End of Question Paper ---</p>
+              <p className="text-sm text-muted-foreground">---- End of Question Paper ----</p>
             </div>
           </CardContent>
         </Card>
