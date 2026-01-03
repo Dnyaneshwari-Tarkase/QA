@@ -318,7 +318,7 @@ const Index = () => {
           </div>
           <div className="border-t border-border mt-8 pt-8 text-center">
             <p className="text-sm text-muted-foreground">
-              © 2025 QuestionIQ. Built by Dnyaneshwari Tarkase.
+              © 2026 QuestionIQ. Built by Dnyaneshwari Tarkase.
             </p>
           </div>
         </div>
