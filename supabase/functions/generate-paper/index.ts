@@ -34,15 +34,44 @@ function sanitizeJsonString(text: string): string {
 }
 
 // Extract readable text from PDF content (basic extraction)
-function extractTextFromPDF(content: string): string {
+function extractTextFromPDF(content: string, startPage: number = 1, endPage: number = 999): string {
+  // Split content by page markers and filter by page range
+  const pagePattern = /\/Type\s*\/Page[^s]/g;
+  const pages: string[] = [];
+  let lastIndex = 0;
+  let pageNum = 0;
+  let match;
+  
+  // Find all page boundaries
+  const pageIndices: number[] = [];
+  while ((match = pagePattern.exec(content)) !== null) {
+    pageIndices.push(match.index);
+  }
+  
+  // Extract content for each page
+  for (let i = 0; i < pageIndices.length; i++) {
+    pageNum = i + 1;
+    const start = pageIndices[i];
+    const end = i < pageIndices.length - 1 ? pageIndices[i + 1] : content.length;
+    
+    // Only include pages in the specified range
+    if (pageNum >= startPage && pageNum <= endPage) {
+      const pageContent = content.substring(start, end);
+      pages.push(pageContent);
+    }
+  }
+  
+  // If no page markers found, treat entire content as single page
+  const contentToProcess = pages.length > 0 ? pages.join(' ') : content;
+  
   // Remove binary data and extract readable strings
-  const textMatches = content.match(/[\x20-\x7E\s]{20,}/g) || [];
+  const textMatches = contentToProcess.match(/[\x20-\x7E\s]{20,}/g) || [];
   let extractedText = textMatches.join(' ');
   
   // Try to extract text between stream markers
-  const streamMatches = content.match(/stream\s*([\s\S]*?)\s*endstream/g) || [];
-  for (const match of streamMatches) {
-    const streamContent = match.replace(/stream|endstream/g, '').trim();
+  const streamMatches = contentToProcess.match(/stream\s*([\s\S]*?)\s*endstream/g) || [];
+  for (const streamMatch of streamMatches) {
+    const streamContent = streamMatch.replace(/stream|endstream/g, '').trim();
     // Only include if it looks like readable text
     if (/^[\x20-\x7E\s]+$/.test(streamContent) && streamContent.length > 10) {
       extractedText += ' ' + streamContent;
@@ -54,9 +83,10 @@ function extractTextFromPDF(content: string): string {
   
   // If we couldn't extract meaningful text, return a notice
   if (extractedText.length < 100) {
-    return "Note: The PDF content could not be fully extracted. Please ensure you're uploading a text-based PDF (not a scanned image).";
+    return `Note: The PDF content from pages ${startPage}-${endPage} could not be fully extracted. Please ensure you're uploading a text-based PDF (not a scanned image).`;
   }
   
+  console.log(`Extracted text from pages ${startPage}-${endPage}, length: ${extractedText.length}`);
   return extractedText;
 }
 
@@ -102,7 +132,7 @@ serve(async (req) => {
       });
     }
 
-    const { pdfContent, className, subject, totalMarks, mcqCount, shortCount, longCount } = await req.json();
+    const { pdfContent, className, subject, totalMarks, mcqCount, shortCount, longCount, startPage = 1, endPage = 999 } = await req.json();
 
     if (!pdfContent || !className || !subject || !totalMarks) {
       return new Response(JSON.stringify({ error: 'Missing required fields' }), {
@@ -116,14 +146,16 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
-    // Extract and sanitize text from PDF
-    const extractedText = extractTextFromPDF(pdfContent);
+    console.log(`Processing PDF for pages ${startPage} to ${endPage}`);
+    
+    // Extract and sanitize text from PDF (only from specified page range)
+    const extractedText = extractTextFromPDF(pdfContent, startPage, endPage);
     console.log('Extracted text length:', extractedText.length);
 
     // Generate questions using AI
     const questionPrompt = `You are an experienced school teacher creating an examination paper.
 
-SYLLABUS CONTENT:
+SYLLABUS CONTENT (FROM PAGES ${startPage} TO ${endPage} ONLY):
 ${extractedText.substring(0, 15000)}
 
 EXAM REQUIREMENTS:
@@ -133,6 +165,7 @@ EXAM REQUIREMENTS:
 - MCQ Questions: Exactly ${mcqCount} questions
 - Short Answer Questions: Exactly ${shortCount} questions  
 - Long Answer Questions: Exactly ${longCount} questions
+- Source: Pages ${startPage} to ${endPage} only
 
 STRICT RULES:
 1. Generate EXACTLY the specified number of questions for each type - no more, no less

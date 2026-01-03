@@ -35,6 +35,9 @@ export default function Dashboard() {
   const [mcqCount, setMcqCount] = useState('10');
   const [shortCount, setShortCount] = useState('5');
   const [longCount, setLongCount] = useState('3');
+  const [startPage, setStartPage] = useState('1');
+  const [endPage, setEndPage] = useState('');
+  const [totalPages, setTotalPages] = useState<number | null>(null);
   const [papers, setPapers] = useState<QuestionPaper[]>([]);
   const [loadingPapers, setLoadingPapers] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -88,9 +91,17 @@ export default function Dashboard() {
       const text = event.target?.result as string;
       // For demo, we'll use the raw content - in production, use a proper PDF parser
       setPdfContent(text.substring(0, 50000));
+      
+      // Estimate page count from PDF content
+      const pageMatches = text.match(/\/Type\s*\/Page[^s]/g);
+      const estimatedPages = pageMatches ? pageMatches.length : 10;
+      setTotalPages(estimatedPages);
+      setStartPage('1');
+      setEndPage(String(estimatedPages));
+      
       toast({
         title: 'PDF Uploaded',
-        description: `File "${file.name}" loaded successfully.`,
+        description: `File "${file.name}" loaded (estimated ${estimatedPages} pages).`,
       });
     };
     reader.readAsText(file);
@@ -127,6 +138,8 @@ export default function Dashboard() {
           mcqCount: parseInt(mcqCount),
           shortCount: parseInt(shortCount),
           longCount: parseInt(longCount),
+          startPage: parseInt(startPage) || 1,
+          endPage: parseInt(endPage) || totalPages || 999,
         },
       });
 
@@ -262,11 +275,45 @@ export default function Dashboard() {
                   <label htmlFor="pdf-upload" className="cursor-pointer">
                     <Upload className="h-10 w-10 mx-auto text-muted-foreground mb-2" />
                     <p className="text-sm text-muted-foreground">
-                      {pdfContent ? 'PDF Loaded ✓' : 'Click to upload PDF'}
+                      {pdfContent ? `PDF Loaded ✓ (${totalPages || '?'} pages)` : 'Click to upload PDF'}
                     </p>
                   </label>
                 </div>
               </div>
+
+              {/* Page Range Selection */}
+              {pdfContent && (
+                <div className="space-y-2">
+                  <Label>Page Range (Generate questions from these pages only)</Label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Start Page</Label>
+                      <Input
+                        type="number"
+                        value={startPage}
+                        onChange={(e) => setStartPage(e.target.value)}
+                        min="1"
+                        max={totalPages || undefined}
+                        placeholder="1"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">End Page</Label>
+                      <Input
+                        type="number"
+                        value={endPage}
+                        onChange={(e) => setEndPage(e.target.value)}
+                        min={parseInt(startPage) || 1}
+                        max={totalPages || undefined}
+                        placeholder={String(totalPages || '')}
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Questions will be generated from pages {startPage || 1} to {endPage || totalPages || '?'}
+                  </p>
+                </div>
+              )}
 
               {/* Class & Subject */}
               <div className="grid grid-cols-2 gap-4">

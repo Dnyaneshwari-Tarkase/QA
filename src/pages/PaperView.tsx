@@ -92,35 +92,36 @@ export default function PaperView() {
     
     setLoadingAnswers(true);
     try {
-      const { data, error } = await supabase.functions.invoke('get-answers', {
-        body: {},
-        headers: {},
-      }, );
+      const session = await supabase.auth.getSession();
+      const accessToken = session.data.session?.access_token;
+      
+      if (!accessToken) {
+        throw new Error('Not authenticated');
+      }
 
-      // Use GET with query params
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-answers?paperId=${paperId}`,
         {
           headers: {
-            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+            'Authorization': `Bearer ${accessToken}`,
             'Content-Type': 'application/json',
           },
         }
       );
 
-      const data2 = await response.json();
+      const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data2.error || 'Failed to fetch answers');
+        throw new Error(data.error || 'Failed to fetch answers');
       }
 
-      setAnswers(data2.answers);
+      setAnswers(data.answers);
       setShowAnswers(true);
     } catch (error) {
       console.error('Error fetching answers:', error);
       toast({
         title: 'Access Denied',
-        description: 'Only the teacher who created this paper can view answers.',
+        description: error instanceof Error ? error.message : 'Only the teacher who created this paper can view answers.',
         variant: 'destructive',
       });
     } finally {
