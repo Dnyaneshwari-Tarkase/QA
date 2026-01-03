@@ -237,7 +237,7 @@ const Index = () => {
 
           <div className="grid md:grid-cols-3 gap-6">
             <TestimonialCard
-              quote="ExamForge has saved me hours every week. The question quality is excellent and my students love the clean paper format."
+              quote="QuestionIQ has saved me hours every week. The question quality is excellent and my students love the clean paper format."
               author="Dr. Priya Sharma"
               role="Physics Teacher, Delhi Public School"
             />
@@ -293,7 +293,7 @@ const Index = () => {
               <div className="bg-primary p-2 rounded-lg">
                 <GraduationCap className="h-5 w-5 text-primary-foreground" />
               </div>
-              <span className="font-serif font-bold text-lg">ExamForge</span>
+              <span className="font-serif font-bold text-lg">QuestionIQ</span>
             </div>
             <div className="flex items-center gap-8 text-sm text-muted-foreground">
               <a
