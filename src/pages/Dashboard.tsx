@@ -57,10 +57,13 @@ export default function Dashboard() {
   }, [user, role]);
 
   const fetchPapers = async () => {
+    if (!user) return;
+    
     try {
       const { data, error } = await supabase
         .from('question_papers')
         .select('id, paper_id, class_name, subject, total_marks, mcq_count, short_count, long_count, created_at')
+        .eq('teacher_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
