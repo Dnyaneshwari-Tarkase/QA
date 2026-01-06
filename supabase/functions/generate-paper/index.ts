@@ -132,7 +132,7 @@ serve(async (req) => {
       });
     }
 
-    const { pdfContent, className, subject, totalMarks, mcqCount, shortCount, longCount, startPage = 1, endPage = 999 } = await req.json();
+    const { pdfContent, className, subject, totalMarks, mcqCount, shortCount, longCount, startPage = 1, endPage = 999, paperType = 'printable', examLink = null, teacherSecretCode = null } = await req.json();
 
     if (!pdfContent || !className || !subject || !totalMarks) {
       return new Response(JSON.stringify({ error: 'Missing required fields' }), {
@@ -326,6 +326,9 @@ Generate the answer key now:`;
         long_count: longCount,
         questions: questions,
         pdf_content: sanitizedPdfContent,
+        paper_type: paperType,
+        exam_link: paperType === 'online' ? examLink : null,
+        teacher_secret_code: teacherSecretCode,
       })
       .select()
       .single();

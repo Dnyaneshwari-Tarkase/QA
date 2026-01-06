@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Printer, Eye, EyeOff, ArrowLeft, GraduationCap } from 'lucide-react';
+import { Loader2, Printer, Eye, EyeOff, ArrowLeft, GraduationCap, ExternalLink, Globe } from 'lucide-react';
 
 interface Question {
   number: number;
@@ -43,6 +43,8 @@ interface Paper {
   total_marks: number;
   questions: Questions;
   created_at: string;
+  paper_type: 'printable' | 'online';
+  exam_link: string | null;
 }
 
 export default function PaperView() {
@@ -74,7 +76,9 @@ export default function PaperView() {
       setPaper({
         ...data,
         questions: data.questions as unknown as Questions,
-      } as Paper);
+        paper_type: (data as unknown as Paper).paper_type || 'printable',
+        exam_link: (data as unknown as Paper).exam_link || null,
+      } as unknown as Paper);
     } catch (error) {
       console.error('Error fetching paper:', error);
       toast({
@@ -226,6 +230,37 @@ export default function PaperView() {
           </CardHeader>
           
           <CardContent className="pt-6 space-y-8">
+            {/* Online Exam Link - only shown to logged-in users for online papers */}
+            {paper.paper_type === 'online' && paper.exam_link && (
+              user ? (
+                <div className="bg-primary/10 rounded-lg p-4 border border-primary/20">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Globe className="h-5 w-5 text-primary" />
+                    <h3 className="font-semibold text-primary">Online Exam</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Click the button below to access the online examination form.
+                  </p>
+                  <Button asChild>
+                    <a href={paper.exam_link} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      Open Exam Link
+                    </a>
+                  </Button>
+                </div>
+              ) : (
+                <div className="bg-muted/50 rounded-lg p-4 border border-border">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Globe className="h-5 w-5 text-muted-foreground" />
+                    <h3 className="font-semibold">Online Exam</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Please <a href="/auth" className="text-primary underline">log in</a> to access the online exam link.
+                  </p>
+                </div>
+              )
+            )}
+
             {/* Instructions */}
             <div className="bg-muted/50 rounded-lg p-4">
               <h3 className="font-semibold mb-2">General Instructions:</h3>
@@ -335,7 +370,7 @@ export default function PaperView() {
 
             {/* Footer */}
             <div className="text-center pt-8 border-t border-border">
-              <p className="text-sm text-muted-foreground">---- End of Question Paper ----</p>
+              <p className="text-sm text-muted-foreground">--- End of Question Paper ---</p>
             </div>
           </CardContent>
         </Card>

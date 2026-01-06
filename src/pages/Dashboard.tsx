@@ -8,7 +8,8 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Upload, FileText, Loader2, Link2, LogOut, Eye, Copy, Check, Trash2 } from 'lucide-react';
+import { Upload, FileText, Loader2, Link2, LogOut, Eye, Copy, Check, Trash2, Globe, Printer } from 'lucide-react';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 interface QuestionPaper {
   id: string;
@@ -20,6 +21,8 @@ interface QuestionPaper {
   short_count: number;
   long_count: number;
   created_at: string;
+  paper_type: 'printable' | 'online';
+  exam_link: string | null;
 }
 
 export default function Dashboard() {
@@ -41,6 +44,8 @@ export default function Dashboard() {
   const [papers, setPapers] = useState<QuestionPaper[]>([]);
   const [loadingPapers, setLoadingPapers] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [paperType, setPaperType] = useState<'printable' | 'online'>('printable');
+  const [examLink, setExamLink] = useState('');
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -62,12 +67,16 @@ export default function Dashboard() {
     try {
       const { data, error } = await supabase
         .from('question_papers')
-        .select('id, paper_id, class_name, subject, total_marks, mcq_count, short_count, long_count, created_at')
+        .select('*')
         .eq('teacher_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setPapers(data || []);
+      setPapers((data || []).map(d => ({
+        ...d,
+        paper_type: (d as unknown as QuestionPaper).paper_type || 'printable',
+        exam_link: (d as unknown as QuestionPaper).exam_link || null,
+      })) as unknown as QuestionPaper[]);
     } catch (error) {
       console.error('Error fetching papers:', error);
     } finally {
@@ -143,6 +152,8 @@ export default function Dashboard() {
           longCount: parseInt(longCount),
           startPage: parseInt(startPage) || 1,
           endPage: parseInt(endPage) || totalPages || 999,
+          paperType,
+          examLink: paperType === 'online' ? examLink : null,
         },
       });
 
@@ -390,6 +401,48 @@ export default function Dashboard() {
                   </div>
                 </div>
               </div>
+
+              {/* Paper Type Selection */}
+              <div className="space-y-3">
+                <Label>Paper Type</Label>
+                <RadioGroup 
+                  value={paperType} 
+                  onValueChange={(value: 'printable' | 'online') => setPaperType(value)}
+                  className="flex gap-4"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="printable" id="printable" />
+                    <Label htmlFor="printable" className="flex items-center gap-2 cursor-pointer">
+                      <Printer className="h-4 w-4" />
+                      Printable Paper
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="online" id="online" />
+                    <Label htmlFor="online" className="flex items-center gap-2 cursor-pointer">
+                      <Globe className="h-4 w-4" />
+                      Online Exam
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              {/* Exam Link (only shown for online papers) */}
+              {paperType === 'online' && (
+                <div className="space-y-2">
+                  <Label htmlFor="exam-link">Exam Link (e.g., Google Form)</Label>
+                  <Input
+                    id="exam-link"
+                    type="url"
+                    placeholder="https://forms.google.com/..."
+                    value={examLink}
+                    onChange={(e) => setExamLink(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    This link will only be visible to logged-in students
+                  </p>
+                </div>
+              )}
 
               <Button
                 onClick={handleGenerate}
