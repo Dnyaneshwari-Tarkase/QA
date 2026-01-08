@@ -65,20 +65,46 @@ export default function PaperView() {
   }, [paperId]);
 
   const fetchPaper = async () => {
+    console.log('Fetching paper with paperId:', paperId);
     try {
       const { data, error } = await supabase
         .from('question_papers')
         .select('*')
-        .eq('paper_id', paperId)
-        .single();
+        .eq('paper_id', paperId as string);
+
+      console.log('Query result - data:', data, 'error:', error);
 
       if (error) throw error;
+      
+      if (!data || data.length === 0) {
+        console.log('No paper found for paperId:', paperId);
+        setPaper(null);
+        return;
+      }
+      
+      const paperData = data[0] as unknown as {
+        id: string;
+        paper_id: string;
+        class_name: string;
+        subject: string;
+        total_marks: number;
+        questions: unknown;
+        created_at: string;
+        paper_type: string | null;
+        exam_link: string | null;
+      };
+      
       setPaper({
-        ...data,
-        questions: data.questions as unknown as Questions,
-        paper_type: (data as unknown as Paper).paper_type || 'printable',
-        exam_link: (data as unknown as Paper).exam_link || null,
-      } as unknown as Paper);
+        id: paperData.id,
+        paper_id: paperData.paper_id,
+        class_name: paperData.class_name,
+        subject: paperData.subject,
+        total_marks: paperData.total_marks,
+        questions: paperData.questions as Questions,
+        created_at: paperData.created_at,
+        paper_type: (paperData.paper_type || 'printable') as 'printable' | 'online',
+        exam_link: paperData.exam_link || null,
+      });
     } catch (error) {
       console.error('Error fetching paper:', error);
       toast({

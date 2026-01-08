@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Upload, FileText, Loader2, Link2, LogOut, Eye, Copy, Check, Trash2, Globe, Printer } from 'lucide-react';
+import { Upload, FileText, Loader2, Link2, LogOut, Eye, Copy, Check, Trash2, Globe, Printer, Key } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 interface QuestionPaper {
@@ -23,10 +23,11 @@ interface QuestionPaper {
   created_at: string;
   paper_type: 'printable' | 'online';
   exam_link: string | null;
+  teacher_secret_code: string | null;
 }
 
 export default function Dashboard() {
-  const { user, role, signOut, loading: authLoading } = useAuth();
+  const { user, role, secretCode, signOut, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -44,6 +45,7 @@ export default function Dashboard() {
   const [papers, setPapers] = useState<QuestionPaper[]>([]);
   const [loadingPapers, setLoadingPapers] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [copiedSecretCode, setCopiedSecretCode] = useState(false);
   const [paperType, setPaperType] = useState<'printable' | 'online'>('printable');
   const [examLink, setExamLink] = useState('');
 
@@ -55,13 +57,15 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (user && role === 'teacher') {
-      fetchPapers();
+      fetchTeacherPapers();
+    } else if (user && role === 'student' && secretCode) {
+      fetchStudentPapers();
     } else if (user && role === 'student') {
       setLoadingPapers(false);
     }
-  }, [user, role]);
+  }, [user, role, secretCode]);
 
-  const fetchPapers = async () => {
+  const fetchTeacherPapers = async () => {
     if (!user) return;
     
     try {
@@ -76,6 +80,32 @@ export default function Dashboard() {
         ...d,
         paper_type: (d as unknown as QuestionPaper).paper_type || 'printable',
         exam_link: (d as unknown as QuestionPaper).exam_link || null,
+        teacher_secret_code: (d as unknown as QuestionPaper).teacher_secret_code || null,
+      })) as unknown as QuestionPaper[]);
+    } catch (error) {
+      console.error('Error fetching papers:', error);
+    } finally {
+      setLoadingPapers(false);
+    }
+  };
+
+  const fetchStudentPapers = async () => {
+    if (!secretCode) return;
+    
+    try {
+      // Fetch papers by teacher's secret code
+      const { data, error } = await supabase
+        .from('question_papers')
+        .select('*')
+        .eq('teacher_secret_code', secretCode)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setPapers((data || []).map(d => ({
+        ...d,
+        paper_type: (d as unknown as QuestionPaper).paper_type || 'printable',
+        exam_link: (d as unknown as QuestionPaper).exam_link || null,
+        teacher_secret_code: (d as unknown as QuestionPaper).teacher_secret_code || null,
       })) as unknown as QuestionPaper[]);
     } catch (error) {
       console.error('Error fetching papers:', error);
@@ -97,14 +127,11 @@ export default function Dashboard() {
       return;
     }
 
-    // Read PDF as text (simplified - in production use a PDF parser)
     const reader = new FileReader();
     reader.onload = async (event) => {
       const text = event.target?.result as string;
-      // For demo, we'll use the raw content - in production, use a proper PDF parser
       setPdfContent(text.substring(0, 50000));
       
-      // Estimate page count from PDF content
       const pageMatches = text.match(/\/Type\s*\/Page[^s]/g);
       const estimatedPages = pageMatches ? pageMatches.length : 10;
       setTotalPages(estimatedPages);
@@ -154,6 +181,7 @@ export default function Dashboard() {
           endPage: parseInt(endPage) || totalPages || 999,
           paperType,
           examLink: paperType === 'online' ? examLink : null,
+          teacherSecretCode: secretCode,
         },
       });
 
@@ -168,10 +196,7 @@ export default function Dashboard() {
         description: 'Your question paper has been created successfully.',
       });
 
-      // Refresh papers list
-      fetchPapers();
-
-      // Navigate to view the paper
+      fetchTeacherPapers();
       navigate(`/paper/${data.paperId}`);
     } catch (error) {
       console.error('Generation error:', error);
@@ -196,6 +221,18 @@ export default function Dashboard() {
     });
   };
 
+  const copySecretCode = async () => {
+    if (secretCode) {
+      await navigator.clipboard.writeText(secretCode);
+      setCopiedSecretCode(true);
+      setTimeout(() => setCopiedSecretCode(false), 2000);
+      toast({
+        title: 'Secret Code Copied',
+        description: 'Share this code with your students.',
+      });
+    }
+  };
+
   const handleSignOut = async () => {
     await signOut();
     navigate('/');
@@ -209,6 +246,7 @@ export default function Dashboard() {
     );
   }
 
+  // Student Dashboard
   if (role === 'student') {
     return (
       <div className="min-h-screen bg-background">
@@ -226,18 +264,100 @@ export default function Dashboard() {
           </div>
         </header>
         <main className="container mx-auto px-4 py-8">
-          <Card>
+          {/* Secret Code Display */}
+          <Card className="mb-6">
             <CardHeader>
-              <CardTitle className="font-serif">Student Dashboard</CardTitle>
+              <CardTitle className="font-serif flex items-center gap-2">
+                <Key className="h-5 w-5 text-primary" />
+                Your Teacher's Class
+              </CardTitle>
               <CardDescription>
-                Enter a paper link shared by your teacher to view the question paper.
+                You are connected to your teacher using their secret code
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground">
-                Students can view question papers using the shareable links provided by teachers.
-                Simply paste the link in your browser or ask your teacher for the paper link.
-              </p>
+              <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
+                <Key className="h-4 w-4 text-muted-foreground" />
+                <code className="font-mono text-sm">{secretCode || 'No code assigned'}</code>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Papers List for Students */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="font-serif">Your Question Papers</CardTitle>
+              <CardDescription>
+                Question papers from your teacher are displayed here
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingPapers ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : papers.length === 0 ? (
+                <p className="text-center text-muted-foreground py-8">
+                  No papers available yet. Check back later!
+                </p>
+              ) : (
+                <div className="space-y-3 max-h-[500px] overflow-y-auto">
+                  {papers.map((paper) => (
+                    <div
+                      key={paper.id}
+                      className="border border-border rounded-lg p-4 hover:bg-muted/50 transition-colors cursor-pointer"
+                      onClick={() => {
+                        if (paper.paper_type === 'online' && paper.exam_link) {
+                          window.open(paper.exam_link, '_blank');
+                        } else {
+                          navigate(`/paper/${paper.paper_id}`);
+                        }
+                      }}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-medium">
+                              {paper.subject} - {paper.class_name}
+                            </h4>
+                            {paper.paper_type === 'online' ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+                                <Globe className="h-3 w-3" />
+                                Online
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                                <Printer className="h-3 w-3" />
+                                Printable
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {paper.total_marks} marks • MCQ: {paper.mcq_count}, Short: {paper.short_count}, Long: {paper.long_count}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {new Date(paper.created_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (paper.paper_type === 'online' && paper.exam_link) {
+                              window.open(paper.exam_link, '_blank');
+                            } else {
+                              navigate(`/paper/${paper.paper_id}`);
+                            }
+                          }}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </main>
@@ -245,6 +365,7 @@ export default function Dashboard() {
     );
   }
 
+  // Teacher Dashboard
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-card sticky top-0 z-10">
@@ -262,6 +383,33 @@ export default function Dashboard() {
       </header>
 
       <main className="container mx-auto px-4 py-8">
+        {/* Secret Code Display for Teacher */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="font-serif flex items-center gap-2">
+              <Key className="h-5 w-5 text-primary" />
+              Your Secret Code
+            </CardTitle>
+            <CardDescription>
+              Share this code with your students so they can access your papers
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-2">
+              <div className="flex-1 flex items-center gap-2 p-3 bg-primary/10 rounded-lg border border-primary/20">
+                <Key className="h-4 w-4 text-primary" />
+                <code className="font-mono text-lg font-bold text-primary">{secretCode || 'Loading...'}</code>
+              </div>
+              <Button variant="outline" size="icon" onClick={copySecretCode}>
+                {copiedSecretCode ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Students need this code to sign up and view your papers.
+            </p>
+          </CardContent>
+        </Card>
+
         <div className="grid lg:grid-cols-2 gap-8">
           {/* Generate Paper Section */}
           <Card className="h-fit">
@@ -439,7 +587,7 @@ export default function Dashboard() {
                     onChange={(e) => setExamLink(e.target.value)}
                   />
                   <p className="text-xs text-muted-foreground">
-                    This link will only be visible to logged-in students
+                    This link will be visible to your students
                   </p>
                 </div>
               )}
@@ -490,9 +638,22 @@ export default function Dashboard() {
                     >
                       <div className="flex items-start justify-between">
                         <div>
-                          <h4 className="font-medium">
-                            {paper.subject} - {paper.class_name}
-                          </h4>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-medium">
+                              {paper.subject} - {paper.class_name}
+                            </h4>
+                            {paper.paper_type === 'online' ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+                                <Globe className="h-3 w-3" />
+                                Online
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                                <Printer className="h-3 w-3" />
+                                Printable
+                              </span>
+                            )}
+                          </div>
                           <p className="text-sm text-muted-foreground">
                             {paper.total_marks} marks • MCQ: {paper.mcq_count}, Short: {paper.short_count}, Long: {paper.long_count}
                           </p>

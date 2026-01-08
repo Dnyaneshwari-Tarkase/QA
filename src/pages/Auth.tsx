@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useToast } from '@/hooks/use-toast';
-import { GraduationCap, BookOpen, Loader2 } from 'lucide-react';
+import { GraduationCap, BookOpen, Loader2, Key } from 'lucide-react';
 
 export default function Auth() {
   const [isLoading, setIsLoading] = useState(false);
@@ -19,18 +19,30 @@ export default function Auth() {
   // Login state
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [loginSecretCode, setLoginSecretCode] = useState('');
 
   // Signup state
   const [signupEmail, setSignupEmail] = useState('');
   const [signupPassword, setSignupPassword] = useState('');
   const [signupFullName, setSignupFullName] = useState('');
   const [signupRole, setSignupRole] = useState<'teacher' | 'student'>('teacher');
+  const [signupSecretCode, setSignupSecretCode] = useState('');
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
-    const { error } = await signIn(loginEmail, loginPassword);
+    if (!loginSecretCode.trim()) {
+      toast({
+        title: 'Secret Code Required',
+        description: 'Please enter your secret code to log in.',
+        variant: 'destructive',
+      });
+      setIsLoading(false);
+      return;
+    }
+
+    const { error } = await signIn(loginEmail, loginPassword, loginSecretCode.trim());
 
     if (error) {
       toast({
@@ -63,7 +75,24 @@ export default function Auth() {
       return;
     }
 
-    const { error } = await signUp(signupEmail, signupPassword, signupFullName, signupRole);
+    // Students must provide a valid teacher's secret code
+    if (signupRole === 'student' && !signupSecretCode.trim()) {
+      toast({
+        title: 'Secret Code Required',
+        description: 'Students must enter their teacher\'s secret code to sign up.',
+        variant: 'destructive',
+      });
+      setIsLoading(false);
+      return;
+    }
+
+    const { error } = await signUp(
+      signupEmail, 
+      signupPassword, 
+      signupFullName, 
+      signupRole, 
+      signupSecretCode.trim()
+    );
 
     if (error) {
       toast({
@@ -74,7 +103,9 @@ export default function Auth() {
     } else {
       toast({
         title: 'Account Created!',
-        description: 'You can now log in with your credentials.',
+        description: signupRole === 'teacher' 
+          ? 'Your unique secret code has been generated. Share it with your students!'
+          : 'You can now log in with your credentials.',
       });
       navigate('/dashboard');
     }
@@ -108,7 +139,7 @@ export default function Auth() {
               <CardHeader>
                 <CardTitle className="font-serif">Welcome Back</CardTitle>
                 <CardDescription>
-                  Enter your credentials to access your account
+                  Enter your credentials and Secret Code to access your account
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -122,6 +153,7 @@ export default function Auth() {
                       value={loginEmail}
                       onChange={(e) => setLoginEmail(e.target.value)}
                       required
+                      autoComplete="email"
                     />
                   </div>
                   <div className="space-y-2">
@@ -132,7 +164,26 @@ export default function Auth() {
                       value={loginPassword}
                       onChange={(e) => setLoginPassword(e.target.value)}
                       required
+                      autoComplete="current-password"
                     />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="login-secret-code" className="flex items-center gap-2">
+                      <Key className="h-4 w-4" />
+                      Secret Code
+                    </Label>
+                    <Input
+                      id="login-secret-code"
+                      type="text"
+                      placeholder="e.g., swift-eagle-42"
+                      value={loginSecretCode}
+                      onChange={(e) => setLoginSecretCode(e.target.value)}
+                      required
+                      autoComplete="one-time-code"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      The secret code is created when you sign up. During login, the system only verifies the code you enter. If you forgot your secret code, please check your profile or registration email.
+                    </p>
                   </div>
                   <Button type="submit" className="w-full" disabled={isLoading}>
                     {isLoading ? (
@@ -162,7 +213,7 @@ export default function Auth() {
                     <Input
                       id="signup-name"
                       type="text"
-                      placeholder="Enter your name"
+                      placeholder="John Doe"
                       value={signupFullName}
                       onChange={(e) => setSignupFullName(e.target.value)}
                       required
@@ -173,7 +224,7 @@ export default function Auth() {
                     <Input
                       id="signup-email"
                       type="email"
-                      placeholder="Enter your email"
+                      placeholder="your@email.com"
                       value={signupEmail}
                       onChange={(e) => setSignupEmail(e.target.value)}
                       required
@@ -227,6 +278,36 @@ export default function Auth() {
                       </div>
                     </RadioGroup>
                   </div>
+                  
+                  {signupRole === 'student' && (
+                    <div className="space-y-2">
+                      <Label htmlFor="signup-secret-code" className="flex items-center gap-2">
+                        <Key className="h-4 w-4" />
+                        Teacher's Secret Code
+                      </Label>
+                      <Input
+                        id="signup-secret-code"
+                        type="text"
+                        placeholder="Enter your teacher's secret code"
+                        value={signupSecretCode}
+                        onChange={(e) => setSignupSecretCode(e.target.value)}
+                        required
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Ask your teacher for their secret code to join their class.
+                      </p>
+                    </div>
+                  )}
+
+                  {signupRole === 'teacher' && (
+                    <div className="p-3 bg-primary/10 rounded-lg border border-primary/20">
+                      <p className="text-sm text-primary flex items-center gap-2">
+                        <Key className="h-4 w-4" />
+                        A unique Secret Code will be generated for you upon registration.
+                      </p>
+                    </div>
+                  )}
+
                   <Button type="submit" className="w-full" disabled={isLoading}>
                     {isLoading ? (
                       <>
