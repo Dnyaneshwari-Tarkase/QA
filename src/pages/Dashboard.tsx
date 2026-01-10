@@ -8,8 +8,9 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Upload, FileText, Loader2, Link2, LogOut, Eye, Copy, Check, Trash2, Globe, Printer, Key } from 'lucide-react';
+import { Upload, FileText, Loader2, Link2, LogOut, Eye, Copy, Check, Trash2, Globe, Printer, Key, Timer } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Switch } from '@/components/ui/switch';
 
 interface QuestionPaper {
   id: string;
@@ -48,6 +49,8 @@ export default function Dashboard() {
   const [copiedSecretCode, setCopiedSecretCode] = useState(false);
   const [paperType, setPaperType] = useState<'printable' | 'online'>('printable');
   const [examLink, setExamLink] = useState('');
+  const [examDuration, setExamDuration] = useState('60');
+  const [showCorrectAnswers, setShowCorrectAnswers] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -71,17 +74,12 @@ export default function Dashboard() {
     try {
       const { data, error } = await supabase
         .from('question_papers')
-        .select('*')
+        .select('id, paper_id, class_name, subject, total_marks, mcq_count, short_count, long_count, created_at, paper_type, exam_link, teacher_secret_code')
         .eq('teacher_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setPapers((data || []).map(d => ({
-        ...d,
-        paper_type: (d as unknown as QuestionPaper).paper_type || 'printable',
-        exam_link: (d as unknown as QuestionPaper).exam_link || null,
-        teacher_secret_code: (d as unknown as QuestionPaper).teacher_secret_code || null,
-      })) as unknown as QuestionPaper[]);
+      setPapers((data || []) as QuestionPaper[]);
     } catch (error) {
       console.error('Error fetching papers:', error);
     } finally {
@@ -93,20 +91,14 @@ export default function Dashboard() {
     if (!secretCode) return;
     
     try {
-      // Fetch papers by teacher's secret code
       const { data, error } = await supabase
         .from('question_papers')
-        .select('*')
+        .select('id, paper_id, class_name, subject, total_marks, mcq_count, short_count, long_count, created_at, paper_type, exam_link, teacher_secret_code')
         .eq('teacher_secret_code', secretCode)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setPapers((data || []).map(d => ({
-        ...d,
-        paper_type: (d as unknown as QuestionPaper).paper_type || 'printable',
-        exam_link: (d as unknown as QuestionPaper).exam_link || null,
-        teacher_secret_code: (d as unknown as QuestionPaper).teacher_secret_code || null,
-      })) as unknown as QuestionPaper[]);
+      setPapers((data || []) as QuestionPaper[]);
     } catch (error) {
       console.error('Error fetching papers:', error);
     } finally {
@@ -175,13 +167,15 @@ export default function Dashboard() {
           subject,
           totalMarks: parseInt(totalMarks),
           mcqCount: parseInt(mcqCount),
-          shortCount: parseInt(shortCount),
-          longCount: parseInt(longCount),
+          shortCount: paperType === 'online' ? 0 : parseInt(shortCount),
+          longCount: paperType === 'online' ? 0 : parseInt(longCount),
           startPage: parseInt(startPage) || 1,
           endPage: parseInt(endPage) || totalPages || 999,
           paperType,
-          examLink: paperType === 'online' ? examLink : null,
+          examLink: null,
           teacherSecretCode: secretCode,
+          examDuration: paperType === 'online' ? parseInt(examDuration) : null,
+          showCorrectAnswers: paperType === 'online' ? showCorrectAnswers : false,
         },
       });
 
@@ -193,7 +187,9 @@ export default function Dashboard() {
 
       toast({
         title: 'Paper Generated!',
-        description: 'Your question paper has been created successfully.',
+        description: paperType === 'online' 
+          ? 'Online exam created! Share the link with students.'
+          : 'Your question paper has been created successfully.',
       });
 
       fetchTeacherPapers();
@@ -307,8 +303,8 @@ export default function Dashboard() {
                       key={paper.id}
                       className="border border-border rounded-lg p-4 hover:bg-muted/50 transition-colors cursor-pointer"
                       onClick={() => {
-                        if (paper.paper_type === 'online' && paper.exam_link) {
-                          window.open(paper.exam_link, '_blank');
+                        if (paper.paper_type === 'online') {
+                          navigate(`/exam/${paper.paper_id}`);
                         } else {
                           navigate(`/paper/${paper.paper_id}`);
                         }
@@ -344,8 +340,8 @@ export default function Dashboard() {
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (paper.paper_type === 'online' && paper.exam_link) {
-                              window.open(paper.exam_link, '_blank');
+                            if (paper.paper_type === 'online') {
+                              navigate(`/exam/${paper.paper_id}`);
                             } else {
                               navigate(`/paper/${paper.paper_id}`);
                             }
@@ -519,7 +515,7 @@ export default function Dashboard() {
               {/* Question Limits */}
               <div className="space-y-3">
                 <Label>Question Limits</Label>
-                <div className="grid grid-cols-3 gap-4">
+                <div className={`grid gap-4 ${paperType === 'online' ? 'grid-cols-1' : 'grid-cols-3'}`}>
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">MCQ</Label>
                     <Input
@@ -529,25 +525,34 @@ export default function Dashboard() {
                       min="0"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Short Answer</Label>
-                    <Input
-                      type="number"
-                      value={shortCount}
-                      onChange={(e) => setShortCount(e.target.value)}
-                      min="0"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Long Answer</Label>
-                    <Input
-                      type="number"
-                      value={longCount}
-                      onChange={(e) => setLongCount(e.target.value)}
-                      min="0"
-                    />
-                  </div>
+                  {paperType !== 'online' && (
+                    <>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Short Answer</Label>
+                        <Input
+                          type="number"
+                          value={shortCount}
+                          onChange={(e) => setShortCount(e.target.value)}
+                          min="0"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Long Answer</Label>
+                        <Input
+                          type="number"
+                          value={longCount}
+                          onChange={(e) => setLongCount(e.target.value)}
+                          min="0"
+                        />
+                      </div>
+                    </>
+                  )}
                 </div>
+                {paperType === 'online' && (
+                  <p className="text-xs text-muted-foreground">
+                    Online exams only support MCQ questions
+                  </p>
+                )}
               </div>
 
               {/* Paper Type Selection */}
@@ -575,19 +580,49 @@ export default function Dashboard() {
                 </RadioGroup>
               </div>
 
-              {/* Exam Link (only shown for online papers) */}
+              {/* Exam Settings (only shown for online papers) */}
               {paperType === 'online' && (
-                <div className="space-y-2">
-                  <Label htmlFor="exam-link">Exam Link (e.g., Google Form)</Label>
-                  <Input
-                    id="exam-link"
-                    type="url"
-                    placeholder="https://forms.google.com/..."
-                    value={examLink}
-                    onChange={(e) => setExamLink(e.target.value)}
-                  />
+                <div className="space-y-4 p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                    <Timer className="h-4 w-4" />
+                    <span className="font-medium text-sm">Online Exam Settings</span>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="exam-duration">Exam Duration (minutes)</Label>
+                    <Select value={examDuration} onValueChange={setExamDuration}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select duration" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="15">15 minutes</SelectItem>
+                        <SelectItem value="30">30 minutes</SelectItem>
+                        <SelectItem value="45">45 minutes</SelectItem>
+                        <SelectItem value="60">60 minutes</SelectItem>
+                        <SelectItem value="90">90 minutes</SelectItem>
+                        <SelectItem value="120">120 minutes</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="show-answers">Show Correct Answers</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Students can see correct answers after submission
+                      </p>
+                    </div>
+                    <Switch
+                      id="show-answers"
+                      checked={showCorrectAnswers}
+                      onCheckedChange={setShowCorrectAnswers}
+                    />
+                  </div>
+
                   <p className="text-xs text-muted-foreground">
-                    This link will be visible to your students
+                    • Timer starts when student opens the exam<br />
+                    • Tab switching triggers warnings (auto-submit after 2)<br />
+                    • Each student can only attempt once
                   </p>
                 </div>
               )}

@@ -132,7 +132,7 @@ serve(async (req) => {
       });
     }
 
-    const { pdfContent, className, subject, totalMarks, mcqCount, shortCount, longCount, startPage = 1, endPage = 999, paperType = 'printable', examLink = null, teacherSecretCode = null } = await req.json();
+    const { pdfContent, className, subject, totalMarks, mcqCount, shortCount, longCount, startPage = 1, endPage = 999, paperType = 'printable', examLink = null, teacherSecretCode = null, examDuration = 60, showCorrectAnswers = false } = await req.json();
 
     if (!pdfContent || !className || !subject || !totalMarks) {
       return new Response(JSON.stringify({ error: 'Missing required fields' }), {
@@ -152,8 +152,48 @@ serve(async (req) => {
     const extractedText = extractTextFromPDF(pdfContent, startPage, endPage);
     console.log('Extracted text length:', extractedText.length);
 
+    // For online exams, only generate MCQ questions
+    const isOnlineExam = paperType === 'online';
+    const actualMcqCount = isOnlineExam ? (mcqCount || 10) : mcqCount;
+    const actualShortCount = isOnlineExam ? 0 : shortCount;
+    const actualLongCount = isOnlineExam ? 0 : longCount;
+
     // Generate questions using AI
-    const questionPrompt = `You are an experienced school teacher creating an examination paper.
+    const questionPrompt = isOnlineExam 
+      ? `You are an experienced school teacher creating an ONLINE MCQ examination.
+
+SYLLABUS CONTENT (FROM PAGES ${startPage} TO ${endPage} ONLY):
+${extractedText.substring(0, 15000)}
+
+EXAM REQUIREMENTS:
+- Class: ${className}
+- Subject: ${subject}
+- Total Marks: ${totalMarks}
+- MCQ Questions: Exactly ${actualMcqCount} questions
+- This is an ONLINE exam - ONLY MCQ questions are allowed
+
+STRICT RULES:
+1. Generate EXACTLY ${actualMcqCount} MCQ questions
+2. Each MCQ MUST have exactly 4 options labeled A), B), C), D)
+3. Only ONE correct answer per question
+4. All questions MUST be based on the provided syllabus content only
+5. Use formal school examination language
+6. Questions should be age-appropriate for the specified class
+7. DO NOT include any answers in this response
+8. DO NOT generate short or long answer questions - ONLY MCQ
+
+OUTPUT FORMAT (JSON only, no markdown):
+{
+  "mcq": [
+    { "number": 1, "question": "...", "options": ["A) ...", "B) ...", "C) ...", "D) ..."], "marks": 1 }
+  ],
+  "short": [],
+  "long": [],
+  "totalMarks": ${totalMarks}
+}
+
+Generate the MCQ question paper now:`
+      : `You are an experienced school teacher creating an examination paper.
 
 SYLLABUS CONTENT (FROM PAGES ${startPage} TO ${endPage} ONLY):
 ${extractedText.substring(0, 15000)}
@@ -175,6 +215,7 @@ STRICT RULES:
 5. DO NOT include any answers in this response
 6. Each question type should have appropriate marks allocated
 7. If the syllabus content is unclear, create general questions for the subject and class level
+8. For MCQs, each question MUST have exactly 4 options labeled A), B), C), D)
 
 OUTPUT FORMAT (JSON only, no markdown):
 {
@@ -321,14 +362,16 @@ Generate the answer key now:`;
         class_name: className,
         subject: subject,
         total_marks: totalMarks,
-        mcq_count: mcqCount,
-        short_count: shortCount,
-        long_count: longCount,
+        mcq_count: isOnlineExam ? actualMcqCount : mcqCount,
+        short_count: actualShortCount,
+        long_count: actualLongCount,
         questions: questions,
         pdf_content: sanitizedPdfContent,
         paper_type: paperType,
-        exam_link: paperType === 'online' ? examLink : null,
+        exam_link: paperType === 'online' ? null : null, // Online exams use internal system, not external links
         teacher_secret_code: teacherSecretCode,
+        exam_duration: isOnlineExam ? examDuration : null,
+        show_correct_answers: isOnlineExam ? showCorrectAnswers : false,
       })
       .select()
       .single();

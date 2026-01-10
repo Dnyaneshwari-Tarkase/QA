@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Printer, Eye, EyeOff, ArrowLeft, GraduationCap, ExternalLink, Globe } from 'lucide-react';
+import { Loader2, Printer, Eye, EyeOff, ArrowLeft, GraduationCap, Globe } from 'lucide-react';
 
 interface Question {
   number: number;
@@ -51,6 +51,7 @@ export default function PaperView() {
   const { paperId } = useParams<{ paperId: string }>();
   const { user, role, loading: authLoading } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const [paper, setPaper] = useState<Paper | null>(null);
   const [answers, setAnswers] = useState<Answers | null>(null);
@@ -267,11 +268,9 @@ export default function PaperView() {
                   <p className="text-sm text-muted-foreground mb-3">
                     Click the button below to access the online examination form.
                   </p>
-                  <Button asChild>
-                    <a href={paper.exam_link} target="_blank" rel="noopener noreferrer">
-                      <ExternalLink className="h-4 w-4 mr-2" />
-                      Open Exam Link
-                    </a>
+                  <Button onClick={() => navigate(paper.exam_link!)}>
+                    <Globe className="h-4 w-4 mr-2" />
+                    Open Exam Link
                   </Button>
                 </div>
               ) : (

@@ -104,14 +104,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Generate unique code for teacher
       finalSecretCode = generateSecretCode();
     } else {
-      // For students, verify the teacher's secret code exists
-      const { data: teacherProfile, error: teacherError } = await supabase
-        .from('profiles')
-        .select('id, secret_code')
-        .eq('secret_code', secretCode)
-        .single();
+      // For students, verify the teacher's secret code exists using the security definer function
+      const { data: isValid, error: validationError } = await supabase
+        .rpc('validate_teacher_secret_code', { code: secretCode });
 
-      if (teacherError || !teacherProfile) {
+      if (validationError || !isValid) {
         return { error: new Error('Invalid teacher secret code. Please check with your teacher.') };
       }
     }
