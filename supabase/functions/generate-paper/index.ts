@@ -16,6 +16,81 @@ function sanitizeText(text: string): string {
     .trim();
 }
 
+// Detect language from text content (Marathi, Hindi, or English)
+function detectLanguage(text: string): 'marathi' | 'hindi' | 'english' {
+  // Common Marathi Unicode range: 0x0900-0x097F (Devanagari) with Marathi-specific patterns
+  // Common Hindi Unicode range: 0x0900-0x097F (Devanagari)
+  
+  // Count Devanagari characters
+  const devanagariChars = (text.match(/[\u0900-\u097F]/g) || []).length;
+  const totalChars = text.replace(/\s/g, '').length;
+  
+  // If less than 10% Devanagari, assume English
+  if (devanagariChars / totalChars < 0.1) {
+    return 'english';
+  }
+  
+  // Marathi-specific words and patterns
+  const marathiPatterns = [
+    /आहे/g, /आहेत/g, /होते/g, /होती/g, /करणे/g, /करणार/g,
+    /म्हणून/g, /म्हणजे/g, /आणि/g, /किंवा/g, /परंतु/g,
+    /असे/g, /असा/g, /अशी/g, /याचा/g, /त्याचा/g,
+    /कोणत्या/g, /कोणती/g, /कोणता/g, /काय/g, /कसे/g,
+    /सांगा/g, /लिहा/g, /स्पष्ट/g, /वर्णन/g
+  ];
+  
+  // Hindi-specific words and patterns
+  const hindiPatterns = [
+    /है/g, /हैं/g, /था/g, /थी/g, /करना/g, /करेंगे/g,
+    /इसलिए/g, /क्योंकि/g, /और/g, /या/g, /लेकिन/g,
+    /ऐसा/g, /ऐसी/g, /ऐसे/g, /इसका/g, /उसका/g,
+    /कौन/g, /कौनसा/g, /कौनसी/g, /क्या/g, /कैसे/g,
+    /बताइए/g, /लिखिए/g, /स्पष्ट/g, /वर्णन/g
+  ];
+  
+  let marathiScore = 0;
+  let hindiScore = 0;
+  
+  for (const pattern of marathiPatterns) {
+    marathiScore += (text.match(pattern) || []).length;
+  }
+  
+  for (const pattern of hindiPatterns) {
+    hindiScore += (text.match(pattern) || []).length;
+  }
+  
+  console.log(`Language detection - Marathi: ${marathiScore}, Hindi: ${hindiScore}`);
+  
+  if (marathiScore > hindiScore) {
+    return 'marathi';
+  } else if (hindiScore > marathiScore) {
+    return 'hindi';
+  }
+  
+  // Default to Hindi if both are equal and Devanagari is present
+  return devanagariChars > 0 ? 'hindi' : 'english';
+}
+
+// Get language instruction for AI prompts
+function getLanguageInstruction(language: 'marathi' | 'hindi' | 'english'): string {
+  switch (language) {
+    case 'marathi':
+      return `CRITICAL LANGUAGE REQUIREMENT: The PDF content is in MARATHI. You MUST generate the ENTIRE question paper in MARATHI language only. 
+      - All questions must be written in Marathi (मराठी)
+      - All MCQ options must be in Marathi
+      - Use proper Marathi grammar and formal examination language
+      - Do NOT mix English words unless they are technical terms with no Marathi equivalent`;
+    case 'hindi':
+      return `CRITICAL LANGUAGE REQUIREMENT: The PDF content is in HINDI. You MUST generate the ENTIRE question paper in HINDI language only.
+      - All questions must be written in Hindi (हिंदी)
+      - All MCQ options must be in Hindi
+      - Use proper Hindi grammar and formal examination language
+      - Do NOT mix English words unless they are technical terms with no Hindi equivalent`;
+    default:
+      return `Generate the question paper in English with formal examination language.`;
+  }
+}
+
 // Sanitize JSON string before parsing - more aggressive cleaning
 function sanitizeJsonString(text: string): string {
   return text
@@ -152,6 +227,11 @@ serve(async (req) => {
     const extractedText = extractTextFromPDF(pdfContent, startPage, endPage);
     console.log('Extracted text length:', extractedText.length);
 
+    // Detect language of the PDF content
+    const detectedLanguage = detectLanguage(extractedText);
+    const languageInstruction = getLanguageInstruction(detectedLanguage);
+    console.log(`Detected language: ${detectedLanguage}`);
+
     // For online exams, only generate MCQ questions
     const isOnlineExam = paperType === 'online';
     const actualMcqCount = isOnlineExam ? (mcqCount || 10) : mcqCount;
@@ -161,6 +241,8 @@ serve(async (req) => {
     // Generate questions using AI
     const questionPrompt = isOnlineExam 
       ? `You are an experienced school teacher creating an ONLINE MCQ examination.
+
+${languageInstruction}
 
 SYLLABUS CONTENT (FROM PAGES ${startPage} TO ${endPage} ONLY):
 ${extractedText.substring(0, 15000)}
@@ -181,6 +263,7 @@ STRICT RULES:
 6. Questions should be age-appropriate for the specified class
 7. DO NOT include any answers in this response
 8. DO NOT generate short or long answer questions - ONLY MCQ
+9. ${detectedLanguage === 'english' ? 'Write in English' : `Write EVERYTHING in ${detectedLanguage === 'marathi' ? 'Marathi (मराठी)' : 'Hindi (हिंदी)'}`}
 
 OUTPUT FORMAT (JSON only, no markdown):
 {
@@ -194,6 +277,8 @@ OUTPUT FORMAT (JSON only, no markdown):
 
 Generate the MCQ question paper now:`
       : `You are an experienced school teacher creating an examination paper.
+
+${languageInstruction}
 
 SYLLABUS CONTENT (FROM PAGES ${startPage} TO ${endPage} ONLY):
 ${extractedText.substring(0, 15000)}
@@ -216,6 +301,7 @@ STRICT RULES:
 6. Each question type should have appropriate marks allocated
 7. If the syllabus content is unclear, create general questions for the subject and class level
 8. For MCQs, each question MUST have exactly 4 options labeled A), B), C), D)
+9. ${detectedLanguage === 'english' ? 'Write in English' : `Write EVERYTHING in ${detectedLanguage === 'marathi' ? 'Marathi (मराठी)' : 'Hindi (हिंदी)'}`}
 
 OUTPUT FORMAT (JSON only, no markdown):
 {
@@ -288,7 +374,15 @@ Generate the question paper now:`;
     }
 
     // Generate answers in a separate AI call
+    const answerLanguageInstruction = detectedLanguage === 'english' 
+      ? 'Provide answers in English.'
+      : detectedLanguage === 'marathi' 
+        ? 'IMPORTANT: Provide ALL answers and explanations in MARATHI (मराठी) language only.'
+        : 'IMPORTANT: Provide ALL answers and explanations in HINDI (हिंदी) language only.';
+
     const answerPrompt = `Based on the following questions for ${subject} Class ${className}, provide the complete answer key.
+
+${answerLanguageInstruction}
 
 QUESTIONS:
 ${JSON.stringify(questions, null, 2)}
@@ -299,13 +393,13 @@ ${extractedText.substring(0, 10000)}
 Provide detailed answers in this JSON format (no markdown, pure JSON only):
 {
   "mcq": [
-    { "number": 1, "correctAnswer": "A", "explanation": "Brief explanation" }
+    { "number": 1, "correctAnswer": "A", "explanation": "Brief explanation in ${detectedLanguage === 'marathi' ? 'Marathi' : detectedLanguage === 'hindi' ? 'Hindi' : 'English'}" }
   ],
   "short": [
-    { "number": 1, "answer": "Complete answer text" }
+    { "number": 1, "answer": "Complete answer text in ${detectedLanguage === 'marathi' ? 'Marathi' : detectedLanguage === 'hindi' ? 'Hindi' : 'English'}" }
   ],
   "long": [
-    { "number": 1, "answer": "Detailed answer with all key points" }
+    { "number": 1, "answer": "Detailed answer with all key points in ${detectedLanguage === 'marathi' ? 'Marathi' : detectedLanguage === 'hindi' ? 'Hindi' : 'English'}" }
   ]
 }
 

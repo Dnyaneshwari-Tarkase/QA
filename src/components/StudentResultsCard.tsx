@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -12,7 +11,8 @@ import {
   Loader2, 
   ChevronDown, 
   ChevronUp,
-  TrendingUp
+  TrendingUp,
+  Award
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -66,184 +66,188 @@ export function StudentResultsCard({ paperId, paperTitle, totalMarks }: StudentR
   };
 
   const submittedCount = results.filter(r => r.is_submitted).length;
+  const pendingCount = results.length - submittedCount;
   const averageScore = submittedCount > 0 
     ? Math.round(results.filter(r => r.is_submitted).reduce((sum, r) => sum + (r.score || 0), 0) / submittedCount * 100 / (results[0]?.total_questions || 1))
     : 0;
 
   if (loading) {
     return (
-      <Card className="border-border/40 bg-card/50">
-        <div className="flex items-center justify-center py-5">
-          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+      <div className="bg-card/80 backdrop-blur-sm border border-border/50 rounded-xl p-4 animate-pulse">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 bg-muted rounded-lg" />
+          <div className="flex-1 space-y-2">
+            <div className="h-4 bg-muted rounded w-1/3" />
+            <div className="h-3 bg-muted rounded w-1/4" />
+          </div>
         </div>
-      </Card>
+      </div>
     );
   }
 
   return (
-    <Card className="border-border/40 bg-card shadow-sm hover:shadow-md transition-shadow">
+    <div className="bg-card/90 backdrop-blur-sm border border-border/40 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden">
       {/* Compact Header */}
-      <div 
-        className="flex items-center justify-between px-4 py-3.5 cursor-pointer hover:bg-muted/20 transition-colors"
+      <button 
+        className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/30 transition-colors"
         onClick={() => setExpanded(!expanded)}
       >
         <div className="flex items-center gap-3 min-w-0">
-          <div className="p-2 bg-blue-50 dark:bg-blue-950/40 rounded-lg shrink-0">
-            <Users className="h-4 w-4 text-primary" />
+          <div className="w-9 h-9 bg-gradient-to-br from-primary/20 to-primary/5 rounded-lg flex items-center justify-center shrink-0">
+            <Award className="h-4 w-4 text-primary" />
           </div>
-          <div className="min-w-0">
-            <h3 className="text-sm font-semibold truncate">{paperTitle}</h3>
-            <p className="text-xs text-muted-foreground">
-              {results.length} student{results.length !== 1 ? 's' : ''} • {totalMarks} marks
-            </p>
+          <div className="text-left min-w-0">
+            <h3 className="text-sm font-semibold truncate text-foreground">{paperTitle}</h3>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span>{results.length} students</span>
+              <span className="w-1 h-1 rounded-full bg-muted-foreground/40" />
+              <span>{totalMarks} marks</span>
+            </div>
           </div>
         </div>
-        <div className="flex items-center gap-3 shrink-0">
-          <Badge 
-            variant="outline" 
-            className="h-7 px-2.5 text-xs font-medium bg-green-50 text-green-700 border-green-200 dark:bg-green-950/40 dark:text-green-400 dark:border-green-800/50"
-          >
-            <CheckCircle className="h-3 w-3 mr-1.5" />
-            {submittedCount} submitted
-          </Badge>
-          <div className="p-1.5 hover:bg-muted/50 rounded-md transition-colors">
+        
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Quick Stats Badges */}
+          <div className="hidden sm:flex items-center gap-1.5">
+            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">
+              <CheckCircle className="h-3 w-3" />
+              {submittedCount}
+            </span>
+            {pendingCount > 0 && (
+              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400">
+                <Clock className="h-3 w-3" />
+                {pendingCount}
+              </span>
+            )}
+          </div>
+          <div className={`w-6 h-6 rounded-md flex items-center justify-center transition-colors ${expanded ? 'bg-muted' : 'hover:bg-muted/50'}`}>
             {expanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
           </div>
         </div>
-      </div>
+      </button>
 
+      {/* Expanded Content */}
       {expanded && (
-        <CardContent className="p-0 border-t border-border/30">
-          {/* Stats Row */}
-          <div className="grid grid-cols-3 gap-3 p-4 bg-muted/10">
-            <div className="flex flex-col items-center py-3 px-4 bg-card rounded-lg border border-border/40">
-              <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
-                <Users className="h-3.5 w-3.5" />
-                <span className="text-[11px] font-medium uppercase tracking-wide">Total</span>
+        <div className="border-t border-border/30 animate-fade-in">
+          {/* Mini Stats Row */}
+          <div className="grid grid-cols-3 gap-2 p-3 bg-muted/20">
+            <div className="flex items-center gap-2 px-3 py-2 bg-card rounded-lg border border-border/30">
+              <Users className="h-3.5 w-3.5 text-muted-foreground" />
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Total</p>
+                <p className="text-base font-bold">{results.length}</p>
               </div>
-              <span className="text-xl font-bold">{results.length}</span>
             </div>
-            <div className="flex flex-col items-center py-3 px-4 bg-green-50/80 dark:bg-green-950/20 rounded-lg border border-green-200/40 dark:border-green-800/30">
-              <div className="flex items-center gap-1.5 text-green-600 dark:text-green-500 mb-1">
-                <CheckCircle className="h-3.5 w-3.5" />
-                <span className="text-[11px] font-medium uppercase tracking-wide">Submitted</span>
+            <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50/80 dark:bg-emerald-950/20 rounded-lg border border-emerald-200/30 dark:border-emerald-800/30">
+              <CheckCircle className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-500" />
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-emerald-600/80 dark:text-emerald-400/80 font-medium">Done</p>
+                <p className="text-base font-bold text-emerald-700 dark:text-emerald-400">{submittedCount}</p>
               </div>
-              <span className="text-xl font-bold text-green-700 dark:text-green-400">{submittedCount}</span>
             </div>
-            <div className="flex flex-col items-center py-3 px-4 bg-red-50/80 dark:bg-red-950/20 rounded-lg border border-red-200/40 dark:border-red-800/30">
-              <div className="flex items-center gap-1.5 text-red-600 dark:text-red-500 mb-1">
-                <TrendingUp className="h-3.5 w-3.5" />
-                <span className="text-[11px] font-medium uppercase tracking-wide">Avg Score</span>
+            <div className="flex items-center gap-2 px-3 py-2 bg-primary/5 dark:bg-primary/10 rounded-lg border border-primary/20 dark:border-primary/30">
+              <TrendingUp className="h-3.5 w-3.5 text-primary" />
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-primary/70 font-medium">Avg</p>
+                <p className="text-base font-bold text-primary">{averageScore}%</p>
               </div>
-              <span className="text-xl font-bold text-red-600 dark:text-red-400">{averageScore}%</span>
             </div>
           </div>
 
-          {/* Table Header */}
-          <div className="grid grid-cols-12 gap-2 px-4 py-2.5 bg-muted/30 text-[11px] font-semibold text-muted-foreground uppercase tracking-wide border-y border-border/30">
-            <div className="col-span-4">Student</div>
-            <div className="col-span-2 text-center">Status</div>
-            <div className="col-span-2 text-center">Score</div>
-            <div className="col-span-2 text-center hidden sm:block">Performance</div>
-            <div className="col-span-2 text-right hidden md:block">Submitted</div>
-          </div>
-
-          {/* Student List */}
+          {/* Compact Table */}
           {results.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground text-sm">
+              <Users className="h-8 w-8 mx-auto mb-2 opacity-40" />
               No students have started this exam yet.
             </div>
           ) : (
-            <ScrollArea className="max-h-[300px]">
-              <div className="divide-y divide-border/20">
-                {results.map((result) => {
-                  const percentage = result.is_submitted && result.total_questions 
-                    ? Math.round((result.score || 0) / result.total_questions * 100) 
-                    : 0;
-                  
-                  return (
-                    <div 
-                      key={result.attempt_id} 
-                      className="grid grid-cols-12 gap-2 px-4 py-3 items-center hover:bg-muted/10 transition-colors"
-                    >
-                      {/* Student Info */}
-                      <div className="col-span-4 min-w-0">
-                        <p className="font-medium text-sm truncate">{result.student_name}</p>
-                        <p className="text-xs text-muted-foreground truncate">{result.student_email}</p>
-                      </div>
-
-                      {/* Status */}
-                      <div className="col-span-2 flex justify-center">
-                        {result.is_submitted ? (
-                          <Badge className="h-6 text-[11px] px-2 bg-green-100 text-green-700 hover:bg-green-100 border-0 dark:bg-green-900/40 dark:text-green-400 font-medium">
-                            <CheckCircle className="h-3 w-3 mr-1" />
-                            Submitted
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="h-6 text-[11px] px-2 bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800/50 font-medium">
-                            <Clock className="h-3 w-3 mr-1" />
-                            Pending
-                          </Badge>
-                        )}
-                      </div>
-
-                      {/* Score */}
-                      <div className="col-span-2 text-center">
-                        {result.is_submitted ? (
-                          <div>
-                            <span className="font-bold text-base">
-                              {result.score ?? 0}
-                              <span className="text-xs text-muted-foreground font-normal">/{result.total_questions}</span>
-                            </span>
-                            <div className="flex items-center justify-center gap-2 mt-0.5">
-                              <span className="text-[11px] text-green-600 dark:text-green-400 flex items-center font-medium">
-                                <CheckCircle className="h-3 w-3 mr-0.5" />
-                                {result.correct_count}
-                              </span>
-                              <span className="text-[11px] text-red-500 dark:text-red-400 flex items-center font-medium">
-                                <XCircle className="h-3 w-3 mr-0.5" />
-                                {result.wrong_count}
-                              </span>
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </div>
-
-                      {/* Performance Bar */}
-                      <div className="col-span-2 hidden sm:flex items-center gap-2">
-                        {result.is_submitted ? (
-                          <>
-                            <Progress value={percentage} className="h-2 flex-1" />
-                            <span className="text-xs font-semibold w-9 text-right">{percentage}%</span>
-                          </>
-                        ) : (
-                          <span className="text-muted-foreground text-center w-full">—</span>
-                        )}
-                      </div>
-
-                      {/* Submission Time */}
-                      <div className="col-span-2 text-right hidden md:block">
-                        <span className="text-xs text-muted-foreground">
-                          {result.submitted_at 
-                            ? new Date(result.submitted_at).toLocaleString(undefined, {
-                                day: 'numeric',
-                                month: 'short',
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              })
-                            : '—'}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
+            <>
+              {/* Table Header */}
+              <div className="grid grid-cols-12 gap-1 px-4 py-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider bg-muted/30 border-y border-border/20">
+                <div className="col-span-5 md:col-span-4">Student</div>
+                <div className="col-span-3 md:col-span-2 text-center">Status</div>
+                <div className="col-span-4 md:col-span-3 text-center">Score</div>
+                <div className="hidden md:block col-span-3 text-right">Time</div>
               </div>
-            </ScrollArea>
+
+              {/* Scrollable List */}
+              <ScrollArea className="max-h-[280px]">
+                <div className="divide-y divide-border/10">
+                  {results.map((result, index) => {
+                    const percentage = result.is_submitted && result.total_questions 
+                      ? Math.round((result.score || 0) / result.total_questions * 100) 
+                      : 0;
+                    
+                    return (
+                      <div 
+                        key={result.attempt_id} 
+                        className="grid grid-cols-12 gap-1 px-4 py-2.5 items-center hover:bg-muted/20 transition-colors"
+                        style={{ animationDelay: `${index * 20}ms` }}
+                      >
+                        {/* Student */}
+                        <div className="col-span-5 md:col-span-4 min-w-0">
+                          <p className="text-sm font-medium truncate">{result.student_name}</p>
+                          <p className="text-[11px] text-muted-foreground truncate">{result.student_email}</p>
+                        </div>
+
+                        {/* Status */}
+                        <div className="col-span-3 md:col-span-2 flex justify-center">
+                          {result.is_submitted ? (
+                            <Badge className="h-5 text-[10px] px-1.5 bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-0 dark:bg-emerald-900/40 dark:text-emerald-400 font-medium">
+                              <CheckCircle className="h-2.5 w-2.5 mr-0.5" />
+                              Done
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="h-5 text-[10px] px-1.5 bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800/50 font-medium">
+                              <Clock className="h-2.5 w-2.5 mr-0.5" />
+                              Pending
+                            </Badge>
+                          )}
+                        </div>
+
+                        {/* Score */}
+                        <div className="col-span-4 md:col-span-3">
+                          {result.is_submitted ? (
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-baseline gap-1">
+                                  <span className="text-sm font-bold">{result.score ?? 0}</span>
+                                  <span className="text-[10px] text-muted-foreground">/{result.total_questions}</span>
+                                </div>
+                                <Progress value={percentage} className="h-1 mt-1" />
+                              </div>
+                              <div className="flex gap-1 text-[10px] shrink-0">
+                                <span className="text-emerald-600 dark:text-emerald-400 font-medium">{result.correct_count}✓</span>
+                                <span className="text-red-500 dark:text-red-400 font-medium">{result.wrong_count}✗</span>
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground text-center block">—</span>
+                          )}
+                        </div>
+
+                        {/* Time */}
+                        <div className="hidden md:block col-span-3 text-right">
+                          <span className="text-[11px] text-muted-foreground">
+                            {result.submitted_at 
+                              ? new Date(result.submitted_at).toLocaleString(undefined, {
+                                  day: 'numeric',
+                                  month: 'short',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })
+                              : '—'}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </ScrollArea>
+            </>
           )}
-        </CardContent>
+        </div>
       )}
-    </Card>
+    </div>
   );
 }
