@@ -1,0 +1,20 @@
+{
+    "logs": [
+        {
+            "outputFile": "com.myapp.twa.app-mergeDebugResources-3:/values-v29/values-v29.xml",
+            "map": [
+                {
+                    "source": "C:\\Users\\Dnyaneshwari Tarkase\\.gradle\\caches\\8.14.3\\transforms\\e70ec0514e3a3983bed4d5d5232c7990\\transformed\\jetified-core-splashscreen-1.0.1\\res\\values-v29\\values-v29.xml",
+                    "from": {
+                        "startLines": "2,7",
+                        "startColumns": "4,4",
+                        "startOffsets": "55,374",
+                        "endLines": "6,8",
+                        "endColumns": "12,12",
+                        "endOffsets": "369,464"
+                    }
+                }
+            ]
+        }
+    ]
+}

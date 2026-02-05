@@ -1,0 +1,8 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Dnyanex</string>
+    <string name="title_activity_main">Dnyanex</string>
+    <string name="package_name">com.dnyaneshwari.dnyanex</string>
+    <string name="custom_url_scheme">com.dnyaneshwari.dnyanex</string>
+    <string name="asset_statements">[]</string>
+</resources>

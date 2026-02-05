@@ -1,0 +1,135 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="com.myapp.twa"
+4    android:versionCode="1"
+5    android:versionName="1.0" >
+6
+7    <uses-sdk
+8        android:minSdkVersion="21"
+8-->C:\Self\QA\android-twa\app\src\main\AndroidManifest.xml
+9        android:targetSdkVersion="33" />
+9-->C:\Self\QA\android-twa\app\src\main\AndroidManifest.xml
+10
+11    <queries>
+11-->[com.google.androidbrowserhelper:androidbrowserhelper:2.4.0] C:\Users\Dnyaneshwari Tarkase\.gradle\caches\8.14.3\transforms\a295bb787d2e054af0645b35a1f8fe25\transformed\jetified-androidbrowserhelper-2.4.0\AndroidManifest.xml:26:5-34:15
+12        <intent>
+12-->[com.google.androidbrowserhelper:androidbrowserhelper:2.4.0] C:\Users\Dnyaneshwari Tarkase\.gradle\caches\8.14.3\transforms\a295bb787d2e054af0645b35a1f8fe25\transformed\jetified-androidbrowserhelper-2.4.0\AndroidManifest.xml:27:9-33:18
+13            <action android:name="android.intent.action.VIEW" />
+13-->C:\Self\QA\android-twa\app\src\main\AndroidManifest.xml:29:17-69
+13-->C:\Self\QA\android-twa\app\src\main\AndroidManifest.xml:29:25-66
+14
+15            <category android:name="android.intent.category.BROWSABLE" />
+15-->C:\Self\QA\android-twa\app\src\main\AndroidManifest.xml:31:17-78
+15-->C:\Self\QA\android-twa\app\src\main\AndroidManifest.xml:31:27-75
+16
+17            <data android:scheme="https" />
+17-->C:\Self\QA\android-twa\app\src\main\AndroidManifest.xml:32:17-34:65
+17-->C:\Self\QA\android-twa\app\src\main\AndroidManifest.xml:33:21-43
+18        </intent>
+19    </queries>
+20
+21    <permission
+21-->[androidx.core:core:1.9.0] C:\Users\Dnyaneshwari Tarkase\.gradle\caches\8.14.3\transforms\039f0fae597cdbd3b0f9b9667138e8c3\transformed\core-1.9.0\AndroidManifest.xml:22:5-24:47
+22        android:name="com.myapp.twa.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+22-->[androidx.core:core:1.9.0] C:\Users\Dnyaneshwari Tarkase\.gradle\caches\8.14.3\transforms\039f0fae597cdbd3b0f9b9667138e8c3\transformed\core-1.9.0\AndroidManifest.xml:23:9-81
+23        android:protectionLevel="signature" />
+23-->[androidx.core:core:1.9.0] C:\Users\Dnyaneshwari Tarkase\.gradle\caches\8.14.3\transforms\039f0fae597cdbd3b0f9b9667138e8c3\transformed\core-1.9.0\AndroidManifest.xml:24:9-44
+24
+25    <uses-permission android:name="com.myapp.twa.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+25-->[androidx.core:core:1.9.0] C:\Users\Dnyaneshwari Tarkase\.gradle\caches\8.14.3\transforms\039f0fae597cdbd3b0f9b9667138e8c3\transformed\core-1.9.0\AndroidManifest.xml:26:5-97
+25-->[androidx.core:core:1.9.0] C:\Users\Dnyaneshwari Tarkase\.gradle\caches\8.14.3\transforms\039f0fae597cdbd3b0f9b9667138e8c3\transformed\core-1.9.0\AndroidManifest.xml:26:22-94
+26
+27    <application
+27-->C:\Self\QA\android-twa\app\src\main\AndroidManifest.xml:5:5-38:19
+28        android:allowBackup="true"
+28-->C:\Self\QA\android-twa\app\src\main\AndroidManifest.xml:6:9-35
+29        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
+29-->[androidx.core:core:1.9.0] C:\Users\Dnyaneshwari Tarkase\.gradle\caches\8.14.3\transforms\039f0fae597cdbd3b0f9b9667138e8c3\transformed\core-1.9.0\AndroidManifest.xml:28:18-86
+30        android:debuggable="true"
+31        android:icon="@mipmap/ic_launcher"
+31-->C:\Self\QA\android-twa\app\src\main\AndroidManifest.xml:7:9-43
+32        android:label="MyApp"
+32-->C:\Self\QA\android-twa\app\src\main\AndroidManifest.xml:8:9-30
+33        android:roundIcon="@mipmap/ic_launcher_round"
+33-->C:\Self\QA\android-twa\app\src\main\AndroidManifest.xml:9:9-54
+34        android:supportsRtl="true"
+34-->C:\Self\QA\android-twa\app\src\main\AndroidManifest.xml:10:9-35
+35        android:theme="@style/Theme.Design.NoActionBar" >
+35-->C:\Self\QA\android-twa\app\src\main\AndroidManifest.xml:11:9-56
+36        <meta-data
+36-->C:\Self\QA\android-twa\app\src\main\AndroidManifest.xml:13:9-15:59
+37            android:name="asset_statements"
+37-->C:\Self\QA\android-twa\app\src\main\AndroidManifest.xml:14:13-44
+38            android:resource="@string/asset_statements" />
+38-->C:\Self\QA\android-twa\app\src\main\AndroidManifest.xml:15:13-56
+39
+40        <activity
+40-->C:\Self\QA\android-twa\app\src\main\AndroidManifest.xml:17:9-36:20
+41            android:name="com.google.androidbrowserhelper.trusted.LauncherActivity"
+41-->C:\Self\QA\android-twa\app\src\main\AndroidManifest.xml:17:19-90
+42            android:exported="true" >
+42-->C:\Self\QA\android-twa\app\src\main\AndroidManifest.xml:18:13-36
+43            <meta-data
+43-->C:\Self\QA\android-twa\app\src\main\AndroidManifest.xml:19:13-21:71
+44                android:name="android.support.customtabs.trusted.DEFAULT_URL"
+44-->C:\Self\QA\android-twa\app\src\main\AndroidManifest.xml:20:17-78
+45                android:value="https://qa-dnyaneshwari.vercel.app/" />
+45-->C:\Self\QA\android-twa\app\src\main\AndroidManifest.xml:21:17-68
+46
+47            <intent-filter>
+47-->C:\Self\QA\android-twa\app\src\main\AndroidManifest.xml:23:13-26:29
+48                <action android:name="android.intent.action.MAIN" />
+48-->C:\Self\QA\android-twa\app\src\main\AndroidManifest.xml:24:17-69
+48-->C:\Self\QA\android-twa\app\src\main\AndroidManifest.xml:24:25-66
+49
+50                <category android:name="android.intent.category.LAUNCHER" />
+50-->C:\Self\QA\android-twa\app\src\main\AndroidManifest.xml:25:17-77
+50-->C:\Self\QA\android-twa\app\src\main\AndroidManifest.xml:25:27-74
+51            </intent-filter>
+52            <intent-filter android:autoVerify="true" >
+52-->C:\Self\QA\android-twa\app\src\main\AndroidManifest.xml:28:13-35:29
+52-->C:\Self\QA\android-twa\app\src\main\AndroidManifest.xml:28:28-53
+53                <action android:name="android.intent.action.VIEW" />
+53-->C:\Self\QA\android-twa\app\src\main\AndroidManifest.xml:29:17-69
+53-->C:\Self\QA\android-twa\app\src\main\AndroidManifest.xml:29:25-66
+54
+55                <category android:name="android.intent.category.DEFAULT" />
+55-->C:\Self\QA\android-twa\app\src\main\AndroidManifest.xml:30:17-76
+55-->C:\Self\QA\android-twa\app\src\main\AndroidManifest.xml:30:27-73
+56                <category android:name="android.intent.category.BROWSABLE" />
+56-->C:\Self\QA\android-twa\app\src\main\AndroidManifest.xml:31:17-78
+56-->C:\Self\QA\android-twa\app\src\main\AndroidManifest.xml:31:27-75
+57
+58                <data
+58-->C:\Self\QA\android-twa\app\src\main\AndroidManifest.xml:32:17-34:65
+59                    android:host="qa-dnyaneshwari.vercel.app"
+59-->C:\Self\QA\android-twa\app\src\main\AndroidManifest.xml:34:21-62
+60                    android:scheme="https" />
+60-->C:\Self\QA\android-twa\app\src\main\AndroidManifest.xml:33:21-43
+61            </intent-filter>
+62        </activity>
+63
+64        <provider
+64-->[androidx.emoji2:emoji2:1.2.0] C:\Users\Dnyaneshwari Tarkase\.gradle\caches\8.14.3\transforms\6d78c44b3aae12899445f6f867f631b1\transformed\jetified-emoji2-1.2.0\AndroidManifest.xml:24:9-32:20
+65            android:name="androidx.startup.InitializationProvider"
+65-->[androidx.emoji2:emoji2:1.2.0] C:\Users\Dnyaneshwari Tarkase\.gradle\caches\8.14.3\transforms\6d78c44b3aae12899445f6f867f631b1\transformed\jetified-emoji2-1.2.0\AndroidManifest.xml:25:13-67
+66            android:authorities="com.myapp.twa.androidx-startup"
+66-->[androidx.emoji2:emoji2:1.2.0] C:\Users\Dnyaneshwari Tarkase\.gradle\caches\8.14.3\transforms\6d78c44b3aae12899445f6f867f631b1\transformed\jetified-emoji2-1.2.0\AndroidManifest.xml:26:13-68
+67            android:exported="false" >
+67-->[androidx.emoji2:emoji2:1.2.0] C:\Users\Dnyaneshwari Tarkase\.gradle\caches\8.14.3\transforms\6d78c44b3aae12899445f6f867f631b1\transformed\jetified-emoji2-1.2.0\AndroidManifest.xml:27:13-37
+68            <meta-data
+68-->[androidx.emoji2:emoji2:1.2.0] C:\Users\Dnyaneshwari Tarkase\.gradle\caches\8.14.3\transforms\6d78c44b3aae12899445f6f867f631b1\transformed\jetified-emoji2-1.2.0\AndroidManifest.xml:29:13-31:52
+69                android:name="androidx.emoji2.text.EmojiCompatInitializer"
+69-->[androidx.emoji2:emoji2:1.2.0] C:\Users\Dnyaneshwari Tarkase\.gradle\caches\8.14.3\transforms\6d78c44b3aae12899445f6f867f631b1\transformed\jetified-emoji2-1.2.0\AndroidManifest.xml:30:17-75
+70                android:value="androidx.startup" />
+70-->[androidx.emoji2:emoji2:1.2.0] C:\Users\Dnyaneshwari Tarkase\.gradle\caches\8.14.3\transforms\6d78c44b3aae12899445f6f867f631b1\transformed\jetified-emoji2-1.2.0\AndroidManifest.xml:31:17-49
+71            <meta-data
+71-->[androidx.lifecycle:lifecycle-process:2.4.1] C:\Users\Dnyaneshwari Tarkase\.gradle\caches\8.14.3\transforms\4dcaa6bcb6c7cb7bab57ee0d597032ee\transformed\jetified-lifecycle-process-2.4.1\AndroidManifest.xml:31:13-33:52
+72                android:name="androidx.lifecycle.ProcessLifecycleInitializer"
+72-->[androidx.lifecycle:lifecycle-process:2.4.1] C:\Users\Dnyaneshwari Tarkase\.gradle\caches\8.14.3\transforms\4dcaa6bcb6c7cb7bab57ee0d597032ee\transformed\jetified-lifecycle-process-2.4.1\AndroidManifest.xml:32:17-78
+73                android:value="androidx.startup" />
+73-->[androidx.lifecycle:lifecycle-process:2.4.1] C:\Users\Dnyaneshwari Tarkase\.gradle\caches\8.14.3\transforms\4dcaa6bcb6c7cb7bab57ee0d597032ee\transformed\jetified-lifecycle-process-2.4.1\AndroidManifest.xml:33:17-49
+74        </provider>
+75    </application>
+76
+77</manifest>
