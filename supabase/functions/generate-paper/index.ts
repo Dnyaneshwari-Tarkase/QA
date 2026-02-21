@@ -1,10 +1,14 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import * as pdfjsLib from "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.379/+esm";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Set up PDF.js worker - use unpkg for better reliability
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@4.0.379/build/pdf.worker.min.js`;
 
 // Sanitize text content to remove null characters and non-printable chars
 function sanitizeText(text: string): string {
@@ -14,81 +18,6 @@ function sanitizeText(text: string): string {
     .replace(/\\u0000/g, '') // Remove escaped null characters
     .replace(/[\r\n]+/g, ' ') // Replace newlines with spaces for cleaner text
     .trim();
-}
-
-// Detect language from text content (Marathi, Hindi, or English)
-function detectLanguage(text: string): 'marathi' | 'hindi' | 'english' {
-  // Common Marathi Unicode range: 0x0900-0x097F (Devanagari) with Marathi-specific patterns
-  // Common Hindi Unicode range: 0x0900-0x097F (Devanagari)
-  
-  // Count Devanagari characters
-  const devanagariChars = (text.match(/[\u0900-\u097F]/g) || []).length;
-  const totalChars = text.replace(/\s/g, '').length;
-  
-  // If less than 10% Devanagari, assume English
-  if (devanagariChars / totalChars < 0.1) {
-    return 'english';
-  }
-  
-  // Marathi-specific words and patterns
-  const marathiPatterns = [
-    /आहे/g, /आहेत/g, /होते/g, /होती/g, /करणे/g, /करणार/g,
-    /म्हणून/g, /म्हणजे/g, /आणि/g, /किंवा/g, /परंतु/g,
-    /असे/g, /असा/g, /अशी/g, /याचा/g, /त्याचा/g,
-    /कोणत्या/g, /कोणती/g, /कोणता/g, /काय/g, /कसे/g,
-    /सांगा/g, /लिहा/g, /स्पष्ट/g, /वर्णन/g
-  ];
-  
-  // Hindi-specific words and patterns
-  const hindiPatterns = [
-    /है/g, /हैं/g, /था/g, /थी/g, /करना/g, /करेंगे/g,
-    /इसलिए/g, /क्योंकि/g, /और/g, /या/g, /लेकिन/g,
-    /ऐसा/g, /ऐसी/g, /ऐसे/g, /इसका/g, /उसका/g,
-    /कौन/g, /कौनसा/g, /कौनसी/g, /क्या/g, /कैसे/g,
-    /बताइए/g, /लिखिए/g, /स्पष्ट/g, /वर्णन/g
-  ];
-  
-  let marathiScore = 0;
-  let hindiScore = 0;
-  
-  for (const pattern of marathiPatterns) {
-    marathiScore += (text.match(pattern) || []).length;
-  }
-  
-  for (const pattern of hindiPatterns) {
-    hindiScore += (text.match(pattern) || []).length;
-  }
-  
-  console.log(`Language detection - Marathi: ${marathiScore}, Hindi: ${hindiScore}`);
-  
-  if (marathiScore > hindiScore) {
-    return 'marathi';
-  } else if (hindiScore > marathiScore) {
-    return 'hindi';
-  }
-  
-  // Default to Hindi if both are equal and Devanagari is present
-  return devanagariChars > 0 ? 'hindi' : 'english';
-}
-
-// Get language instruction for AI prompts
-function getLanguageInstruction(language: 'marathi' | 'hindi' | 'english'): string {
-  switch (language) {
-    case 'marathi':
-      return `CRITICAL LANGUAGE REQUIREMENT: The PDF content is in MARATHI. You MUST generate the ENTIRE question paper in MARATHI language only. 
-      - All questions must be written in Marathi (मराठी)
-      - All MCQ options must be in Marathi
-      - Use proper Marathi grammar and formal examination language
-      - Do NOT mix English words unless they are technical terms with no Marathi equivalent`;
-    case 'hindi':
-      return `CRITICAL LANGUAGE REQUIREMENT: The PDF content is in HINDI. You MUST generate the ENTIRE question paper in HINDI language only.
-      - All questions must be written in Hindi (हिंदी)
-      - All MCQ options must be in Hindi
-      - Use proper Hindi grammar and formal examination language
-      - Do NOT mix English words unless they are technical terms with no Hindi equivalent`;
-    default:
-      return `Generate the question paper in English with formal examination language.`;
-  }
 }
 
 // Sanitize JSON string before parsing - more aggressive cleaning
@@ -108,61 +37,143 @@ function sanitizeJsonString(text: string): string {
     .trim();
 }
 
-// Extract readable text from PDF content (basic extraction)
-function extractTextFromPDF(content: string, startPage: number = 1, endPage: number = 999): string {
-  // Split content by page markers and filter by page range
-  const pagePattern = /\/Type\s*\/Page[^s]/g;
-  const pages: string[] = [];
-  let lastIndex = 0;
-  let pageNum = 0;
-  let match;
-  
-  // Find all page boundaries
-  const pageIndices: number[] = [];
-  while ((match = pagePattern.exec(content)) !== null) {
-    pageIndices.push(match.index);
-  }
-  
-  // Extract content for each page
-  for (let i = 0; i < pageIndices.length; i++) {
-    pageNum = i + 1;
-    const start = pageIndices[i];
-    const end = i < pageIndices.length - 1 ? pageIndices[i + 1] : content.length;
+// Extract readable text from PDF content using PDF.js - OPTIMIZED for speed
+async function extractTextFromPDF(pdfContent: string, startPage: number = 1, endPage: number = 1000): Promise<string> {
+  try {
+    // Check content size - reject if too large (>50MB base64 for 1000+ pages)
+    if (pdfContent.length > 50 * 1024 * 1024) {
+      console.error('PDF content too large:', pdfContent.length);
+      return fallbackExtractText(pdfContent.substring(0, 1000000), startPage, endPage);
+    }
+
+    let pdfData: Uint8Array;
     
-    // Only include pages in the specified range
-    if (pageNum >= startPage && pageNum <= endPage) {
-      const pageContent = content.substring(start, end);
-      pages.push(pageContent);
+    try {
+      // Decode base64 to binary
+      const binaryString = atob(pdfContent);
+      pdfData = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        pdfData[i] = binaryString.charCodeAt(i);
+      }
+    } catch (decodeError) {
+      console.warn('Base64 decode failed, using fallback extraction');
+      return fallbackExtractText(pdfContent, startPage, endPage);
     }
-  }
-  
-  // If no page markers found, treat entire content as single page
-  const contentToProcess = pages.length > 0 ? pages.join(' ') : content;
-  
-  // Remove binary data and extract readable strings
-  const textMatches = contentToProcess.match(/[\x20-\x7E\s]{20,}/g) || [];
-  let extractedText = textMatches.join(' ');
-  
-  // Try to extract text between stream markers
-  const streamMatches = contentToProcess.match(/stream\s*([\s\S]*?)\s*endstream/g) || [];
-  for (const streamMatch of streamMatches) {
-    const streamContent = streamMatch.replace(/stream|endstream/g, '').trim();
-    // Only include if it looks like readable text
-    if (/^[\x20-\x7E\s]+$/.test(streamContent) && streamContent.length > 10) {
-      extractedText += ' ' + streamContent;
+
+    // Load PDF document with timeout
+    const pdf = await Promise.race([
+      pdfjsLib.getDocument({ data: pdfData }).promise,
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('PDF parsing timeout')), 30000)
+      )
+    ]);
+    
+    const maxPages = Math.min(pdf.numPages, endPage);
+    const minPage = Math.max(1, startPage);
+    
+    let extractedText = '';
+    let totalLength = 0;
+    const maxLength = 100000; // Limit extracted text to 100K chars for 1000+ pages
+
+    // Extract text from each page with early exit
+    for (let pageNum = minPage; pageNum <= maxPages; pageNum++) {
+      if (totalLength >= maxLength) break; // Stop if we have enough text
+      
+      try {
+        const page = await pdf.getPage(pageNum);
+        const textContent = await page.getTextContent();
+        
+        // Extract and join text items
+        const pageText = textContent.items
+          .map((item: any) => {
+            if ('str' in item) {
+              return item.str;
+            }
+            return '';
+          })
+          .filter((s: string) => s.length > 0)
+          .join(' ');
+        
+        if (pageText.trim().length > 0) {
+          extractedText += pageText + ' ';
+          totalLength += pageText.length;
+        }
+      } catch (pageError) {
+        console.warn(`Failed to extract text from page ${pageNum}:`, pageError);
+        // Continue with next page
+      }
     }
+
+    // Clean up the extracted text
+    extractedText = sanitizeText(extractedText);
+
+    // If we couldn't extract meaningful text, try fallback
+    if (extractedText.length < 50) {
+      console.warn('PDF.js extraction too short, trying fallback');
+      extractedText = fallbackExtractText(pdfContent.substring(0, 500000), startPage, endPage);
+    }
+
+    if (extractedText.length < 20) {
+      return `Note: Could not extract text from pages ${startPage}-${maxPages}. Please ensure the PDF is text-based (not scanned images).`;
+    }
+
+    console.log(`Extracted ${extractedText.length} chars from pages ${startPage}-${maxPages}`);
+    return extractedText;
+  } catch (error) {
+    console.error('PDF.js extraction error:', error);
+    // Fallback to basic extraction
+    return fallbackExtractText(pdfContent.substring(0, 500000), startPage, endPage);
   }
-  
-  // Clean up the extracted text
-  extractedText = sanitizeText(extractedText);
-  
-  // If we couldn't extract meaningful text, return a notice
-  if (extractedText.length < 100) {
-    return `Note: The PDF content from pages ${startPage}-${endPage} could not be fully extracted. Please ensure you're uploading a text-based PDF (not a scanned image).`;
+}
+
+// Fallback text extraction for when PDF.js fails - OPTIMIZED for speed
+function fallbackExtractText(content: string, startPage: number = 1, endPage: number = 1000): string {
+  try {
+    const textMatches: string[] = [];
+    let charCount = 0;
+    const maxChars = 30000;
+    
+    // Match content between BT (begin text) and ET (end text) markers
+    const btEtPattern = /BT\s*([\s\S]{0,5000}?)\s*ET/g;
+    let match;
+    
+    while ((match = btEtPattern.exec(content)) !== null && charCount < maxChars) {
+      const textStream = match[1];
+      // Extract string literals
+      const stringPattern = /\((.*?)\)/g;
+      let stringMatch;
+      while ((stringMatch = stringPattern.exec(textStream)) !== null && charCount < maxChars) {
+        const text = stringMatch[1];
+        // Only include readable text
+        if (text.length > 3 && /[\x20-\x7E]/.test(text)) {
+          textMatches.push(text);
+          charCount += text.length;
+        }
+      }
+    }
+
+    let extractedText = textMatches.join(' ');
+    
+    // If still minimal, try simpler pattern
+    if (extractedText.length < 50 && charCount < maxChars) {
+      const simpleStringPattern = /\(([^\)]{5,200})\)/g;
+      const allStrings: string[] = [];
+      let stringMatch;
+      while ((stringMatch = simpleStringPattern.exec(content)) !== null && charCount < maxChars) {
+        const text = stringMatch[1];
+        if (/[\x20-\x7E]/.test(text) && text.length > 5) {
+          allStrings.push(text);
+          charCount += text.length;
+        }
+      }
+      extractedText = allStrings.join(' ');
+    }
+
+    return sanitizeText(extractedText);
+  } catch (error) {
+    console.error('Fallback extraction error:', error);
+    return '';
   }
-  
-  console.log(`Extracted text from pages ${startPage}-${endPage}, length: ${extractedText.length}`);
-  return extractedText;
 }
 
 serve(async (req) => {
@@ -207,7 +218,7 @@ serve(async (req) => {
       });
     }
 
-    const { pdfContent, className, subject, totalMarks, mcqCount, shortCount, longCount, startPage = 1, endPage = 999, paperType = 'printable', examLink = null, teacherSecretCode = null, examDuration = 60, showCorrectAnswers = false } = await req.json();
+    const { pdfContent, className, subject, totalMarks, mcqCount, shortCount, longCount, startPage = 1, endPage = 1000, paperType = 'printable', examLink = null, teacherSecretCode = null, examDuration = 60, showCorrectAnswers = false } = await req.json();
 
     if (!pdfContent || !className || !subject || !totalMarks) {
       return new Response(JSON.stringify({ error: 'Missing required fields' }), {
@@ -227,11 +238,6 @@ serve(async (req) => {
     const extractedText = extractTextFromPDF(pdfContent, startPage, endPage);
     console.log('Extracted text length:', extractedText.length);
 
-    // Detect language of the PDF content
-    const detectedLanguage = detectLanguage(extractedText);
-    const languageInstruction = getLanguageInstruction(detectedLanguage);
-    console.log(`Detected language: ${detectedLanguage}`);
-
     // For online exams, only generate MCQ questions
     const isOnlineExam = paperType === 'online';
     const actualMcqCount = isOnlineExam ? (mcqCount || 10) : mcqCount;
@@ -242,10 +248,8 @@ serve(async (req) => {
     const questionPrompt = isOnlineExam 
       ? `You are an experienced school teacher creating an ONLINE MCQ examination.
 
-${languageInstruction}
-
 SYLLABUS CONTENT (FROM PAGES ${startPage} TO ${endPage} ONLY):
-${extractedText.substring(0, 15000)}
+${extractedText.substring(0, 5000)}
 
 EXAM REQUIREMENTS:
 - Class: ${className}
@@ -263,7 +267,6 @@ STRICT RULES:
 6. Questions should be age-appropriate for the specified class
 7. DO NOT include any answers in this response
 8. DO NOT generate short or long answer questions - ONLY MCQ
-9. ${detectedLanguage === 'english' ? 'Write in English' : `Write EVERYTHING in ${detectedLanguage === 'marathi' ? 'Marathi (मराठी)' : 'Hindi (हिंदी)'}`}
 
 OUTPUT FORMAT (JSON only, no markdown):
 {
@@ -278,10 +281,8 @@ OUTPUT FORMAT (JSON only, no markdown):
 Generate the MCQ question paper now:`
       : `You are an experienced school teacher creating an examination paper.
 
-${languageInstruction}
-
 SYLLABUS CONTENT (FROM PAGES ${startPage} TO ${endPage} ONLY):
-${extractedText.substring(0, 15000)}
+${extractedText.substring(0, 5000)}
 
 EXAM REQUIREMENTS:
 - Class: ${className}
@@ -301,7 +302,6 @@ STRICT RULES:
 6. Each question type should have appropriate marks allocated
 7. If the syllabus content is unclear, create general questions for the subject and class level
 8. For MCQs, each question MUST have exactly 4 options labeled A), B), C), D)
-9. ${detectedLanguage === 'english' ? 'Write in English' : `Write EVERYTHING in ${detectedLanguage === 'marathi' ? 'Marathi (मराठी)' : 'Hindi (हिंदी)'}`}
 
 OUTPUT FORMAT (JSON only, no markdown):
 {
@@ -320,20 +320,29 @@ OUTPUT FORMAT (JSON only, no markdown):
 Generate the question paper now:`;
 
     console.log('Generating questions with AI...');
-    const questionResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'system', content: 'You are an expert school teacher who creates examination papers. Always respond with valid JSON only, no markdown formatting.' },
-          { role: 'user', content: questionPrompt }
-        ],
+    
+    // Add 60 second timeout for faster response
+    const questionResponse = await Promise.race([
+      fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-2.5-flash',
+          messages: [
+            { role: 'system', content: 'Generate examination questions in valid JSON format only. No markdown, no explanations.' },
+            { role: 'user', content: questionPrompt }
+          ],
+          temperature: 0.7,
+          max_tokens: 2000,
+        }),
       }),
-    });
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('AI question generation timeout after 60 seconds')), 60000)
+      )
+    ]) as Response;
 
     if (!questionResponse.ok) {
       const errorText = await questionResponse.text();
@@ -373,82 +382,10 @@ Generate the question paper now:`;
       throw new Error('Failed to parse AI response for questions');
     }
 
-    // Generate answers in a separate AI call
-    const answerLanguageInstruction = detectedLanguage === 'english' 
-      ? 'Provide answers in English.'
-      : detectedLanguage === 'marathi' 
-        ? 'IMPORTANT: Provide ALL answers and explanations in MARATHI (मराठी) language only.'
-        : 'IMPORTANT: Provide ALL answers and explanations in HINDI (हिंदी) language only.';
-
-    const answerPrompt = `Based on the following questions for ${subject} Class ${className}, provide the complete answer key.
-
-${answerLanguageInstruction}
-
-QUESTIONS:
-${JSON.stringify(questions, null, 2)}
-
-SYLLABUS CONTENT FOR REFERENCE:
-${extractedText.substring(0, 10000)}
-
-Provide detailed answers in this JSON format (no markdown, pure JSON only):
-{
-  "mcq": [
-    { "number": 1, "correctAnswer": "A", "explanation": "Brief explanation in ${detectedLanguage === 'marathi' ? 'Marathi' : detectedLanguage === 'hindi' ? 'Hindi' : 'English'}" }
-  ],
-  "short": [
-    { "number": 1, "answer": "Complete answer text in ${detectedLanguage === 'marathi' ? 'Marathi' : detectedLanguage === 'hindi' ? 'Hindi' : 'English'}" }
-  ],
-  "long": [
-    { "number": 1, "answer": "Detailed answer with all key points in ${detectedLanguage === 'marathi' ? 'Marathi' : detectedLanguage === 'hindi' ? 'Hindi' : 'English'}" }
-  ]
-}
-
-Generate the answer key now:`;
-
-    console.log('Generating answers with AI...');
-    const answerResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'system', content: 'You are an expert teacher providing answer keys. Always respond with valid JSON only, no markdown formatting.' },
-          { role: 'user', content: answerPrompt }
-        ],
-      }),
-    });
-
-    if (!answerResponse.ok) {
-      console.error('AI answer generation error:', answerResponse.status);
-      throw new Error('Failed to generate answers');
-    }
-
-    const answerData = await answerResponse.json();
-    const answersText = answerData.choices?.[0]?.message?.content || '';
-    
-    let answers;
-    try {
-      // Clean the response using the sanitize function
-      const cleanedText = sanitizeJsonString(answersText);
-      
-      const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        answers = JSON.parse(jsonMatch[0]);
-      } else {
-        throw new Error('No valid JSON found');
-      }
-    } catch (parseError) {
-      console.error('Failed to parse answers:', parseError, answersText.substring(0, 500));
-      throw new Error('Failed to parse answers');
-    }
-
     // Sanitize the PDF content for storage (remove binary/null chars)
     const sanitizedPdfContent = sanitizeText(extractedText).substring(0, 50000);
 
-    // Save question paper to database
+    // Save question paper to database IMMEDIATELY (without waiting for answers)
     const { data: paper, error: paperError } = await supabaseClient
       .from('question_papers')
       .insert({
@@ -462,7 +399,7 @@ Generate the answer key now:`;
         questions: questions,
         pdf_content: sanitizedPdfContent,
         paper_type: paperType,
-        exam_link: paperType === 'online' ? null : null, // Online exams use internal system, not external links
+        exam_link: paperType === 'online' ? null : null,
         teacher_secret_code: teacherSecretCode,
         exam_duration: isOnlineExam ? examDuration : null,
         show_correct_answers: isOnlineExam ? showCorrectAnswers : false,
@@ -475,21 +412,12 @@ Generate the answer key now:`;
       throw new Error('Failed to save question paper');
     }
 
-    // Save answers separately (only teacher can access via RLS)
-    const { error: answerError } = await supabaseClient
-      .from('answers')
-      .insert({
-        paper_id: paper.id,
-        teacher_id: user.id,
-        answers: answers,
-      });
-
-    if (answerError) {
-      console.error('Error saving answers:', answerError);
-      throw new Error('Failed to save answers');
-    }
-
+    // Return success immediately with questions - don't wait for answers
     console.log('Paper generated successfully:', paper.paper_id);
+    
+    // Generate answers asynchronously in background (non-blocking)
+    generateAnswersAsync(supabaseClient, paper.id, user.id, subject, className, questions, extractedText)
+      .catch(err => console.error('Async answer generation failed:', err));
 
     return new Response(JSON.stringify({
       success: true,
@@ -499,7 +427,6 @@ Generate the answer key now:`;
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
-
   } catch (error) {
     console.error('Error in generate-paper:', error);
     return new Response(JSON.stringify({ 
@@ -510,3 +437,100 @@ Generate the answer key now:`;
     });
   }
 });
+
+// Async function to generate answers without blocking user response
+async function generateAnswersAsync(
+  supabaseClient: any,
+  paperId: string,
+  teacherId: string,
+  subject: string,
+  className: string,
+  questions: any,
+  extractedText: string
+): Promise<void> {
+  try {
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    if (!LOVABLE_API_KEY) return;
+
+    const answerPrompt = `Based on the following questions for ${subject} Class ${className}, provide the complete answer key.
+
+QUESTIONS:
+${JSON.stringify(questions, null, 2).substring(0, 3000)}
+
+SYLLABUS CONTENT FOR REFERENCE:
+${extractedText.substring(0, 5000)}
+
+Provide answers in this JSON format (no markdown, pure JSON):
+{
+  "mcq": [
+    { "number": 1, "correctAnswer": "A" }
+  ],
+  "short": [
+    { "number": 1, "answer": "..." }
+  ],
+  "long": [
+    { "number": 1, "answer": "..." }
+  ]
+}`;
+
+    console.log('Generating answers asynchronously...');
+
+    const answerResponse = await Promise.race([
+      fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-2.5-flash',
+          messages: [
+            { role: 'system', content: 'Generate answer keys in valid JSON format only.' },
+            { role: 'user', content: answerPrompt }
+          ],
+          temperature: 0.5,
+          max_tokens: 1500,
+        }),
+      }),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Timeout')), 60000)
+      )
+    ]);
+
+    if (!answerResponse.ok) {
+      console.warn('Answer generation failed:', answerResponse.status);
+      return;
+    }
+
+    const answerData = await answerResponse.json();
+    const answersText = answerData.choices?.[0]?.message?.content || '';
+    
+    let answers;
+    try {
+      const cleanedText = sanitizeJsonString(answersText);
+      const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        answers = JSON.parse(jsonMatch[0]);
+      } else {
+        return;
+      }
+    } catch {
+      console.warn('Failed to parse answers');
+      return;
+    }
+
+    // Save answers to database
+    await supabaseClient
+      .from('answers')
+      .insert({
+        paper_id: paperId,
+        teacher_id: teacherId,
+        answers: answers,
+      });
+
+    console.log('Answers generated and saved asynchronously');
+  } catch (error) {
+    console.warn('Async answer generation error:', error);
+    // Don't throw - just log warning, answers can be generated later
+  }
+}
